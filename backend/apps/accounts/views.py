@@ -11,23 +11,27 @@ from .serializers import UserSerializer
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
+    try:
+        username = request.data.get('username')
+        password = request.data.get('password')
 
-    if not username or not password:
-        return Response({'detail': 'Please provide both username and password.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not username or not password:
+            return Response({'detail': 'Please provide both username and password.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = authenticate(username=username, password=password)
-    if not user:
-        # Check if user exists or fallback for initial setup
-        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({'detail': 'Invalid credentials. Please verify your username and password.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    token, _ = Token.objects.get_or_create(user=user)
-    serializer = UserSerializer(user)
-    return Response({
-        'token': token.key,
-        'user': serializer.data
-    })
+        token, _ = Token.objects.get_or_create(user=user)
+        serializer = UserSerializer(user)
+        return Response({
+            'token': token.key,
+            'user': serializer.data
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'detail': f'Login Error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
