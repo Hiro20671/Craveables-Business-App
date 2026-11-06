@@ -1,0 +1,42 @@
+# Python & Virtual Environments
+venv/
+backend/venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+
+# Environment & Secrets
+.env
+.env.local
+*.env
+
+# Local Databases (Data is safely backed up in database_backup.json and backend/craveables_backup.json)
+backend/db.sqlite3
+db.sqlite3
+*.sqlite3-journal
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.bak

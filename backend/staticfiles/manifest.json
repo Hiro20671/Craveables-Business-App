@@ -1,0 +1,23 @@
+{
+  "short_name": "CRAVEABLES",
+  "name": "CRAVEABLES Business Management System",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FFF9DF",
+  "theme_color": "#3B170B",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "food"]
+}
+
