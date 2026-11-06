@@ -20,8 +20,13 @@ class UserProfile(models.Model):
 
 @receiver(post_save, sender=User)
 def create_or_update_user_profile(sender, instance, created, **kwargs):
+    if kwargs.get('raw'):
+        return
     if created:
-        UserProfile.objects.create(user=instance, role=UserRole.ADMIN if instance.is_superuser else UserRole.STAFF)
+        UserProfile.objects.get_or_create(
+            user=instance,
+            defaults={'role': UserRole.ADMIN if instance.is_superuser else UserRole.STAFF}
+        )
     else:
         if hasattr(instance, 'profile'):
             instance.profile.save()
