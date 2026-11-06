@@ -5,11 +5,53 @@ from django.conf.urls.static import static
 from django.http import HttpResponse, FileResponse
 from pathlib import Path
 
-def serve_spa(request):
-    frontend_dist = settings.BASE_DIR.parent / 'frontend' / 'dist'
+import mimetypes
+from pathlib import Path
+from django.contrib import admin
+from django.urls import path, include, re_path
+from django.conf import settings
+from django.conf.urls.static import static
+from django.http import HttpResponse, FileResponse, Http404
+
+def serve_spa(request, resource=""):
+    frontend_dist = (settings.BASE_DIR.parent / 'frontend' / 'dist').resolve()
+    
+    # If a specific static resource is requested (e.g. assets/..., poster-*.jpg, favicon.png)
+    if resource:
+        clean_resource = resource.lstrip('/')
+        file_path = (frontend_dist / clean_resource).resolve()
+        
+        # Verify file is within frontend_dist directory (prevent directory traversal)
+        try:
+            if file_path.is_file() and str(file_path).startswith(str(frontend_dist)):
+                content_type, encoding = mimetypes.guess_type(str(file_path))
+                
+                # Explicit fallback content types
+                if file_path.suffix == '.js':
+                    content_type = 'application/javascript'
+                elif file_path.suffix == '.css':
+                    content_type = 'text/css'
+                elif file_path.suffix == '.json':
+                    content_type = 'application/json'
+                elif file_path.suffix in ['.jpg', '.jpeg']:
+                    content_type = 'image/jpeg'
+                elif file_path.suffix == '.png':
+                    content_type = 'image/png'
+                elif file_path.suffix == '.svg':
+                    content_type = 'image/svg+xml'
+                
+                response = FileResponse(open(file_path, 'rb'), content_type=content_type or 'application/octet-stream')
+                if encoding:
+                    response['Content-Encoding'] = encoding
+                return response
+        except Exception:
+            pass
+
+    # Fallback to index.html for client-side routing (e.g. /, /login, /dashboard)
     index_file = frontend_dist / 'index.html'
     if index_file.exists():
-        return FileResponse(open(index_file, 'rb'))
+        return FileResponse(open(index_file, 'rb'), content_type='text/html')
+        
     return HttpResponse("""
         <!DOCTYPE html>
         <html>
@@ -55,7 +97,7 @@ urlpatterns = [
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
-# Catch-all route to serve the React Single Page App
+# Catch-all route to serve the React Single Page App and static dist files
 urlpatterns += [
-    re_path(r'^(?!api/|admin/|media/|static/).*$', serve_spa),
+    re_path(r'^(?P<resource>(?!api/|admin/|media/|static/).*)$', serve_spa),
 ]
