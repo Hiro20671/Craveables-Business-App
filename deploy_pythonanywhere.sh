@@ -28,13 +28,19 @@ source venv/bin/activate
 pip install --no-cache-dir -r requirements.txt
 
 echo "🔑 [3/5] Setting up environment variables (.env)..."
-if [ ! -f ".env" ]; then
-    AIVEN_URI="$1"
-    if [ -z "$AIVEN_URI" ]; then
-        echo ""
-        echo "Please paste your Aiven PostgreSQL URI (press Enter):"
-        read -r AIVEN_URI
-    fi
+AIVEN_URI="$1"
+if [ -n "$AIVEN_URI" ]; then
+    cat << EOF > .env
+DJANGO_SECRET_KEY='craveables-secret-key-production-ready-2026'
+DJANGO_DEBUG=False
+ALLOWED_HOSTS=jeremy2005.pythonanywhere.com,localhost,127.0.0.1,*
+DATABASE_URL=${AIVEN_URI}
+EOF
+    echo "Updated .env with provided database URI!"
+elif [ ! -f ".env" ]; then
+    echo ""
+    echo "Please paste your Aiven PostgreSQL URI (press Enter):"
+    read -r AIVEN_URI
 
     cat << EOF > .env
 DJANGO_SECRET_KEY='craveables-secret-key-production-ready-2026'

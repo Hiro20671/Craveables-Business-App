@@ -4,8 +4,9 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env file
+# Load .env file from backend/ or project root
 load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR.parent / '.env')
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'craveables-secret-key-production-ready-2026')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
