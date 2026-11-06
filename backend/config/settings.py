@@ -146,6 +146,17 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': None,
 }
 
-# CORS Configuration
+# CORS & CSRF Configuration
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://jeremy2005.pythonanywhere.com',
+    'http://jeremy2005.pythonanywhere.com',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'http://localhost:5173',
+]
+_extra_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _extra_csrf:
+    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in _extra_csrf.split(',') if origin.strip()])
