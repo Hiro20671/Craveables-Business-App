@@ -21,9 +21,11 @@ if [ ! -d "venv" ]; then
     python3.11 -m venv venv
 fi
 
+# Free disk cache to stay within PythonAnywhere 512MB quota
+rm -rf ~/.cache/pip || true
+
 source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --no-cache-dir -r requirements.txt
 
 echo "🔑 [3/5] Setting up environment variables (.env)..."
 if [ ! -f ".env" ]; then
