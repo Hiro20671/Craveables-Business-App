@@ -1,8 +1,27 @@
+import datetime
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from decimal import Decimal
 from apps.products.models import ProductVariant
+
+
+def parse_date_safe(val):
+    if not val:
+        return None
+    if isinstance(val, datetime.datetime):
+        return val.date()
+    if isinstance(val, datetime.date):
+        return val
+    if isinstance(val, str):
+        s = val.strip()[:10]
+        if not s:
+            return None
+        try:
+            return datetime.date.fromisoformat(s)
+        except Exception:
+            return None
+    return None
 
 
 def match_product_variant(item_name: str, price=None):
@@ -200,34 +219,40 @@ class CustomerInquiry(models.Model):
         ordering = ['-created_at']
 
     def save(self, *args, **kwargs):
+        self.target_date = parse_date_safe(self.target_date)
+        self.payment_due_date = parse_date_safe(self.payment_due_date)
+
         if not self.inquiry_number:
-            today_str = timezone.now().strftime('%Y%m%d')
-            count = CustomerInquiry.objects.filter(created_at__date=timezone.now().date()).count() + 1
+            today_str = timezone.now().strftime('%Y%m%d%H%M%S')
+            count = CustomerInquiry.objects.count() + 1
             prefix = "CRV-WSL" if self.order_type == 'WHOLESALE' else "CRV-ORD"
-            self.inquiry_number = f"{prefix}-{today_str}-{count:04d}"
+            self.inquiry_number = f"{prefix}-{today_str}-{count:02d}"
         if not self.shared_order_number:
             self.shared_order_number = self.inquiry_number
 
         # Recalculate remaining balance
-        est = Decimal(str(self.estimated_total or '0.00'))
-        paid = Decimal(str(self.amount_paid or '0.00'))
+        est = Decimal(str(self.estimated_total if self.estimated_total not in [None, ''] else '0.00'))
+        paid = Decimal(str(self.amount_paid if self.amount_paid not in [None, ''] else '0.00'))
+        self.estimated_total = est
+        self.amount_paid = paid
         self.remaining_balance = max(Decimal('0.00'), est - paid)
 
         # Automatic payment status determination
         today = timezone.now().date()
+        due_date = self.payment_due_date
         if self.remaining_balance <= 0 and est > 0:
             self.payment_status = PaymentStatus.PAID
         elif paid > 0:
-            if self.payment_due_date and self.payment_due_date < today:
+            if due_date and due_date < today:
                 self.payment_status = PaymentStatus.OVERDUE
-            elif self.payment_due_date and (self.payment_due_date - today).days <= 7:
+            elif due_date and (due_date - today).days <= 7:
                 self.payment_status = PaymentStatus.DUE_SOON
             else:
                 self.payment_status = PaymentStatus.PARTIALLY_PAID
         else:
-            if self.payment_due_date and self.payment_due_date < today:
+            if due_date and due_date < today:
                 self.payment_status = PaymentStatus.OVERDUE
-            elif self.payment_due_date and (self.payment_due_date - today).days <= 7:
+            elif due_date and (due_date - today).days <= 7:
                 self.payment_status = PaymentStatus.DUE_SOON
             else:
                 self.payment_status = PaymentStatus.UNPAID

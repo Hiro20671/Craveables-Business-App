@@ -21,7 +21,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from .models import (
     SaleOrder, SaleItem, PaymentMethod, CustomerInquiry, InquiryStatus,
     CustomerReview, Customer, CustomerPayment, PaymentStatus, FeaturedOrder,
-    match_product_variant, sync_all_inquiries_to_sales
+    match_product_variant, sync_all_inquiries_to_sales, parse_date_safe
 )
 from .serializers import (
     SaleOrderSerializer, SaleItemSerializer, CustomerInquirySerializer,
@@ -547,17 +547,17 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         delivery_address = data.get('delivery_address', '').strip()
         delivery_method = data.get('delivery_method', 'PICKUP')
         special_instructions = data.get('special_instructions', '')
-        target_date = data.get('target_date') or None
+        target_date = parse_date_safe(data.get('target_date'))
         items_summary = data.get('items_summary', '')
         items_json = data.get('items_json', [])
-        estimated_total = Decimal(str(data.get('estimated_total', '0.00')))
+        estimated_total = Decimal(str(data.get('estimated_total') or '0.00'))
         notes = data.get('notes', '')
         initial_status = data.get('status', InquiryStatus.PENDING)
 
         # Payment options
         payment_type = data.get('payment_type', 'PAY_ON_PICKUP')
-        initial_deposit = Decimal(str(data.get('initial_deposit', '0.00')))
-        payment_due_date = data.get('payment_due_date') or None
+        initial_deposit = Decimal(str(data.get('initial_deposit') or '0.00'))
+        payment_due_date = parse_date_safe(data.get('payment_due_date'))
         payment_notes = data.get('payment_notes', '')
 
         # Customer Profile Linking / Creation (prevents duplicate customer records)
