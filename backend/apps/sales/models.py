@@ -169,6 +169,80 @@ class CustomerInquiry(models.Model):
 
         super().save(*args, **kwargs)
 
+        # Auto-connect to SaleOrder when order is completed
+        if self.status == InquiryStatus.COMPLETED and not self.converted_sale_id:
+            self.auto_create_sale_order()
+
+    def auto_create_sale_order(self):
+        """Automatically creates an official SaleOrder and items when order is COMPLETED."""
+        if self.converted_sale_id:
+            return self.converted_sale
+
+        from apps.products.models import ProductVariant
+
+        sale_receipt = self.shared_order_number or self.inquiry_number
+        existing_sale = SaleOrder.objects.filter(receipt_number=sale_receipt).first()
+        if existing_sale:
+            self.converted_sale = existing_sale
+            CustomerInquiry.objects.filter(pk=self.pk).update(converted_sale=existing_sale)
+            return existing_sale
+
+        pm = PaymentMethod.CASH
+        if hasattr(self, 'payment_type') and self.payment_type in PaymentMethod.values:
+            pm = self.payment_type
+        elif hasattr(self, 'payment_type') and 'gcash' in str(self.payment_type).lower():
+            pm = PaymentMethod.GCASH
+
+        sale_order = SaleOrder.objects.create(
+            receipt_number=sale_receipt,
+            sale_date=self.target_date or timezone.now().date(),
+            customer=self.customer,
+            customer_name=self.customer_name,
+            payment_method=pm,
+            subtotal=self.estimated_total,
+            discount=Decimal('0.00'),
+            total_sales=self.estimated_total,
+            total_cogs=Decimal('0.00'),
+            gross_profit=self.estimated_total,
+            notes=f"Completed Customer Order {self.shared_order_number or self.inquiry_number}. {self.notes}".strip(),
+        )
+
+        total_cogs = Decimal('0.00')
+        items_data = self.items_json or []
+        for item in items_data:
+            name = item.get('name', '')
+            qty = int(item.get('qty', 1))
+            price = Decimal(str(item.get('price', '0.00')))
+
+            variant = ProductVariant.objects.filter(name__icontains=name.split('—')[0].strip()).first()
+            if not variant:
+                variant = ProductVariant.objects.first()
+
+            unit_cost = Decimal('0.0000')
+            if variant and hasattr(variant, 'recipe') and variant.recipe:
+                unit_cost = variant.recipe.calculated_cost_per_unit
+
+            item_cost = unit_cost * Decimal(str(qty))
+            total_cogs += item_cost
+
+            if variant:
+                SaleItem.objects.create(
+                    sale_order=sale_order,
+                    product_variant=variant,
+                    quantity=qty,
+                    selling_price=price if price > 0 else variant.selling_price,
+                    discount=Decimal('0.00'),
+                    historical_unit_cost=unit_cost
+                )
+
+        sale_order.total_cogs = total_cogs
+        sale_order.gross_profit = max(Decimal('0.00'), sale_order.total_sales - total_cogs)
+        sale_order.save()
+
+        self.converted_sale = sale_order
+        CustomerInquiry.objects.filter(pk=self.pk).update(converted_sale=sale_order)
+        return sale_order
+
     def __str__(self):
         return f"{self.inquiry_number} - {self.customer_name} (₱{self.estimated_total:.2f}) [{self.status}]"
 

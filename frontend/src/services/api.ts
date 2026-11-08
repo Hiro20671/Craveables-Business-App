@@ -102,6 +102,8 @@ export const api = {
   getCostMatrix: () => request<any[]>('/costing/recipes/cost-matrix/'),
   getPackagingItems: () => request<any[]>('/costing/packaging-items/'),
   createPackagingItem: (data: any) => request<any>('/costing/packaging-items/', { method: 'POST', body: JSON.stringify(data) }),
+  updatePackagingItem: (id: number, data: any) => request<any>(`/costing/packaging-items/${id}/`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePackagingItem: (id: number) => request<void>(`/costing/packaging-items/${id}/`, { method: 'DELETE' }),
 
   // Production
   getProductionOrders: () => request<any[]>('/production/orders/'),
@@ -188,9 +190,11 @@ export const api = {
   deleteSaleOrder: (id: number) => request<void>(`/sales/orders/${id}/`, { method: 'DELETE' }),
   cancelSaleOrder: (id: number) => request<any>(`/sales/orders/${id}/cancel/`, { method: 'POST' }),
   getSalesSummary: () => request<any>('/sales/orders/summary/'),
+  getSaleReceiptPdfUrl: (id: number) => `${API_BASE}/sales/orders/${id}/receipt-pdf/`,
 
   // Customer Inquiries & Pre-Orders
   getInquiries: () => request<any[]>('/sales/inquiries/'),
+  getInquiryReceiptPdfUrl: (id: number) => `${API_BASE}/sales/inquiries/${id}/receipt-pdf/`,
   createInquiry: (data: any) => request<any>('/sales/inquiries/', { method: 'POST', body: JSON.stringify(data) }),
   updateInquiry: (id: number, data: any) =>
     request<any>(`/sales/inquiries/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),

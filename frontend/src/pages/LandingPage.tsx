@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { FeaturedOrder } from '../types';
+import { calculateWholesaleDiscount } from '../utils/pricing';
 
 interface MenuItem {
   id: string;
@@ -42,6 +43,7 @@ interface MenuItem {
   variants: { name: string; price: number; badge?: string }[];
   highlight: string;
   accentColor: string;
+  wholesaleTag?: string;
 }
 
 const MENU_ITEMS: MenuItem[] = [
@@ -54,6 +56,7 @@ const MENU_ITEMS: MenuItem[] = [
     description: 'Moist, soft and delicious homemade banana cake made with 100% naturally sweet ripe Philippine Lakatan bananas! Baked in an aluminum tin loaf with a red ribbon and wooden spoon, topped with sliced almonds and chocolate chips.',
     highlight: '100% Ripe Philippine Lakatan Bananas • Sliced Almonds & Choc Chips',
     accentColor: '#C88A3B',
+    wholesaleTag: 'Wholesale Discount: Big ₱10-₱15 off • Small 5-10% off',
     variants: [
       { name: 'Banana Cake — Small', price: 60, badge: 'PHP 60.00' },
       { name: 'Banana Cake — Big', price: 135, badge: 'PHP 135.00' },
@@ -68,6 +71,7 @@ const MENU_ITEMS: MenuItem[] = [
     description: 'Rich, chocolatey goodness baked into fudgy squares with a glossy crinkle top. Perfectly soft, delightfully chewy, and not overly sweet. A favorite merienda partner for hot coffee.',
     highlight: 'Deep Dark Cocoa • Dense & Fudgy • Coffee Merienda Favorite',
     accentColor: '#3B170B',
+    wholesaleTag: 'Wholesale Discount: ₱10 off (<10) • ₱20 off (10+ boxes)',
     variants: [
       { name: 'Classic Brownies — Small Box (3 pcs)', price: 110, badge: 'PHP 110.00' },
       { name: 'Classic Brownies — Big Box (6 pcs)', price: 220, badge: 'PHP 220.00' },
@@ -82,7 +86,9 @@ const MENU_ITEMS: MenuItem[] = [
     description: 'Freshly baked homemade red velvet cookies with crispy golden edges and a soft, chewy center packed with melting white chocolate chips.',
     highlight: 'Crispy Edges & Soft Center • Packed with White Chocolate Chips',
     accentColor: '#9B1D20',
+    wholesaleTag: 'Wholesale Discount: ₱5 off each cookie / box',
     variants: [
+      { name: 'Red Velvet Cookie — Single (1 pc)', price: 35, badge: 'PHP 35.00' },
       { name: 'Red Velvet Cookies — Box of 6', price: 210, badge: 'PHP 210.00' },
       { name: 'Red Velvet Cookies — Assorted', price: 190, badge: 'PHP 190.00' },
     ],
@@ -96,7 +102,9 @@ const MENU_ITEMS: MenuItem[] = [
     description: 'Golden home-style butter cookies loaded with rich chocolate morsels. Crisp around the rim and chewy in the middle. Baked fresh daily.',
     highlight: 'Golden Creamery Butter • Loaded with Chocolate Morsels',
     accentColor: '#A97845',
+    wholesaleTag: 'Wholesale Discount: ₱5 off each cookie / box',
     variants: [
+      { name: 'Classic Choco Chip Cookie — Single (1 pc)', price: 30, badge: 'PHP 30.00' },
       { name: 'Choco Chip Cookies — Box of 6', price: 180, badge: 'PHP 180.00' },
       { name: 'Choco Chip Cookies — Assorted', price: 190, badge: 'PHP 190.00' },
     ],
@@ -290,8 +298,23 @@ export const LandingPage: React.FC = () => {
     });
   };
 
-  const totalCartItems = Object.values(orderCart).reduce((sum, item) => sum + item.qty, 0);
-  const totalCartAmount = Object.values(orderCart).reduce((sum, item) => sum + item.qty * item.price, 0);
+  const cartCalculations = Object.values(orderCart).map((item) => {
+    const ws = calculateWholesaleDiscount(item.name, item.price, item.qty);
+    return {
+      ...item,
+      regularTotal: item.price * item.qty,
+      unitDiscount: ws.unitDiscount,
+      totalDiscount: ws.totalDiscount,
+      discountedTotal: ws.finalTotal,
+      tierBadge: ws.tierBadge,
+      discountLabel: ws.discountLabel,
+    };
+  });
+
+  const totalCartItems = cartCalculations.reduce((sum, item) => sum + item.qty, 0);
+  const rawCartAmount = cartCalculations.reduce((sum, item) => sum + item.regularTotal, 0);
+  const totalCartDiscount = cartCalculations.reduce((sum, item) => sum + item.totalDiscount, 0);
+  const totalCartAmount = Math.max(0, rawCartAmount - totalCartDiscount);
 
   const generateOrderSummary = () => {
     let summary = `*CRAVEABLES ORDER INQUIRY*\n`;
@@ -300,9 +323,14 @@ export const LandingPage: React.FC = () => {
     summary += `Contact: ${customerPhone || 'N/A'}\n`;
     summary += `Date Needed: ${deliveryDate || 'ASAP'}\n\n`;
     summary += `*Items Ordered:*\n`;
-    Object.values(orderCart).forEach((item) => {
-      summary += `• ${item.qty}x ${item.name} (₱${item.price} each) = ₱${item.qty * item.price}\n`;
+    cartCalculations.forEach((item) => {
+      const discountText = item.totalDiscount > 0 ? ` (Wholesale discount: -₱${item.totalDiscount.toFixed(2)}) = ₱${item.discountedTotal.toFixed(2)}` : ` = ₱${item.regularTotal.toFixed(2)}`;
+      summary += `• ${item.qty}x ${item.name} (₱${item.price} each)${discountText}\n`;
     });
+    if (totalCartDiscount > 0) {
+      summary += `\n*Subtotal: ₱${rawCartAmount.toFixed(2)}*\n`;
+      summary += `*Wholesale Savings: -₱${totalCartDiscount.toFixed(2)}*\n`;
+    }
     summary += `\n*Total Estimated: ₱${totalCartAmount.toFixed(2)}*\n`;
     if (orderNotes) summary += `Notes: ${orderNotes}\n`;
     summary += `\nPayment: GCash / Bank Transfer / Cash upon pickup`;
@@ -748,6 +776,13 @@ export const LandingPage: React.FC = () => {
                     <Sparkles className="w-3 h-3 text-bakery-caramel shrink-0" />
                     <span className="truncate">{item.highlight}</span>
                   </div>
+
+                  {item.wholesaleTag && (
+                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-900 flex items-center gap-1.5">
+                      <span className="shrink-0 text-xs">🏷️</span>
+                      <span className="truncate">{item.wholesaleTag}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1907,15 +1942,29 @@ export const LandingPage: React.FC = () => {
                       </p>
                     ) : (
                       <div className="divide-y divide-bakery-beige/60 border border-bakery-beige rounded-2xl p-3 bg-white">
-                        {Object.values(orderCart).map((item) => (
+                        {cartCalculations.map((item) => (
                           <div key={item.name} className="py-2 flex items-center justify-between">
                             <div>
-                              <p className="font-semibold text-bakery-chocolate">{item.name}</p>
-                              <p className="text-[10px] text-bakery-muted">₱{item.price} x {item.qty}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-bakery-chocolate">{item.name}</p>
+                                {item.tierBadge && (
+                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
+                                    {item.tierBadge}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-bakery-muted">
+                                ₱{item.price} x {item.qty}
+                                {item.totalDiscount > 0 && (
+                                  <span className="text-emerald-600 ml-1 font-semibold">
+                                    (Save ₱{item.totalDiscount.toFixed(2)})
+                                  </span>
+                                )}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="font-display font-bold text-bakery-caramel">
-                                ₱{(item.price * item.qty).toFixed(2)}
+                                ₱{item.discountedTotal.toFixed(2)}
                               </span>
                               <button
                                 onClick={() => handleRemoveFromCart(item.name)}
@@ -1926,8 +1975,20 @@ export const LandingPage: React.FC = () => {
                             </div>
                           </div>
                         ))}
+                        {totalCartDiscount > 0 && (
+                          <div className="pt-2 border-t border-bakery-beige/60 space-y-1">
+                            <div className="flex justify-between text-bakery-muted text-xs">
+                              <span>Regular Subtotal:</span>
+                              <span>₱{rawCartAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-emerald-600 font-bold text-xs">
+                              <span>🎉 Wholesale Discount:</span>
+                              <span>-₱{totalCartDiscount.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
                         <div className="pt-2 flex justify-between font-bold text-bakery-chocolate text-sm">
-                          <span>Total:</span>
+                          <span>Estimated Total:</span>
                           <span className="font-display text-bakery-caramel">₱{totalCartAmount.toFixed(2)}</span>
                         </div>
                       </div>

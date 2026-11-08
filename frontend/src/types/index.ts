@@ -74,6 +74,7 @@ export interface ProductVariant {
   product_name: string;
   category_name: string;
   name: string;
+  display_name?: string;
   sku: string;
   selling_price: string | number;
   batch_yield: number;

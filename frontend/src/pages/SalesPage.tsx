@@ -21,11 +21,13 @@ import {
   Phone,
   XCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../services/api';
 import { SaleOrder, ProductVariant } from '../types';
+import { calculateWholesaleDiscount, getWholesaleDescription } from '../utils/pricing';
 
 export const SalesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -204,13 +206,27 @@ export const SalesPage: React.FC = () => {
     const updated = [...cartItems];
     if (field === 'product_variant') {
       const v = variants.find((item) => item.id === Number(val));
+      const sp = v ? Number(v.selling_price) : 0;
       updated[index] = {
         ...updated[index],
         product_variant: Number(val),
-        selling_price: v ? Number(v.selling_price) : 0,
+        selling_price: sp,
       };
+      if (v) {
+        const fullName = `${v.product_name || ''} ${v.name}`;
+        const ws = calculateWholesaleDiscount(fullName, sp, updated[index].quantity);
+        updated[index].discount = ws.totalDiscount;
+      }
     } else {
       updated[index] = { ...updated[index], [field]: val };
+      if (field === 'quantity') {
+        const v = variants.find((item) => item.id === updated[index].product_variant);
+        if (v) {
+          const fullName = `${v.product_name || ''} ${v.name}`;
+          const ws = calculateWholesaleDiscount(fullName, updated[index].selling_price, Number(val));
+          updated[index].discount = ws.totalDiscount;
+        }
+      }
     }
     setCartItems(updated);
   };
@@ -447,6 +463,17 @@ export const SalesPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            <a
+                              href={api.getSaleReceiptPdfUrl(s.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              title="Download Official PDF Receipt"
+                              className="p-1.5 rounded-lg hover:bg-bakery-cream text-bakery-chocolate border border-bakery-beige flex items-center justify-center"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
+                            </a>
+
                             <button
                               onClick={() => setViewReceipt(s)}
                               title="Print / View Receipt"
@@ -842,12 +869,31 @@ export const SalesPage: React.FC = () => {
               Thank you for craving with us! 🤎
             </div>
 
-            <div className="pt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setViewReceipt(null)}
-                className="w-full py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108]"
+            <div className="pt-4 flex items-center gap-2">
+              <a
+                href={api.getSaleReceiptPdfUrl(viewReceipt.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="flex-1 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige flex items-center justify-center gap-1.5"
               >
-                Close Receipt
+                <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
+                <span>Download PDF</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-3 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige flex items-center justify-center gap-1"
+                title="Print Receipt"
+              >
+                <Printer className="w-3.5 h-3.5 text-bakery-chocolate" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewReceipt(null)}
+                className="flex-1 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108]"
+              >
+                Close
               </button>
             </div>
           </div>

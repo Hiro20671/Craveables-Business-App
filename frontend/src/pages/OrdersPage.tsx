@@ -1099,6 +1099,18 @@ export const OrdersPage: React.FC = () => {
                           </button>
                         )}
 
+                        <a
+                          href={api.getInquiryReceiptPdfUrl(inq.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="px-2.5 py-1.5 rounded-xl bg-bakery-cream hover:bg-bakery-beige border border-bakery-beige text-bakery-chocolate text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
+                          title="Download Official PDF Receipt for Customer"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
+                          <span>PDF Receipt</span>
+                        </a>
+
                         <button
                           type="button"
                           onClick={() => setSlipInquiry(inq)}

@@ -61,6 +61,14 @@ export const ProductionPage: React.FC = () => {
   const [selectedExtraId, setSelectedExtraId] = useState<number | ''>('');
   const [extraQuantity, setExtraQuantity] = useState<string>('');
 
+  // Edit ingredients for existing batch
+  const [editingIngredientsOrder, setEditingIngredientsOrder] = useState<ProductionOrder | null>(null);
+  const [editingIngredientsList, setEditingIngredientsList] = useState<any[]>([]);
+  const [editingAdjustmentReason, setEditingAdjustmentReason] = useState<string>('');
+  const [editingSelectedExtraId, setEditingSelectedExtraId] = useState<number | ''>('');
+  const [editingExtraQty, setEditingExtraQty] = useState<string>('');
+  const [savingIngredientsEdit, setSavingIngredientsEdit] = useState<boolean>(false);
+
   // Compute clean numeric batch count (fallback to 1 if user is currently typing or empty)
   const parsedBatches = parseFloat(batchesCountInput);
   const effectiveBatches = !isNaN(parsedBatches) && parsedBatches > 0 ? parsedBatches : 1;
@@ -365,6 +373,123 @@ export const ProductionPage: React.FC = () => {
     }
   };
 
+  const openEditIngredientsModal = async (ord: ProductionOrder) => {
+    setEditingIngredientsOrder(ord);
+    setEditingAdjustmentReason(ord.adjustment_reason || 'Manual ingredient adjustment');
+    setEditingSelectedExtraId('');
+    setEditingExtraQty('');
+
+    if (ord.ingredient_usages && ord.ingredient_usages.length > 0) {
+      setEditingIngredientsList(
+        ord.ingredient_usages.map((u: any) => ({
+          ingredient_id: u.ingredient,
+          ingredient_name: u.ingredient_name,
+          unit: u.unit,
+          quantity: Number(u.actual_quantity_used || u.required_quantity),
+          unit_cost: Number(u.unit_cost_snapshot || 0),
+          is_additional: Boolean(u.is_additional),
+          notes: u.notes || '',
+        }))
+      );
+    } else {
+      try {
+        const res = await api.checkProductionRequirements(ord.recipe, Number(ord.batches_count));
+        if (res?.requirements) {
+          setEditingIngredientsList(
+            res.requirements.map((req: any) => ({
+              ingredient_id: req.ingredient_id,
+              ingredient_name: req.ingredient_name,
+              unit: req.unit,
+              quantity: req.required_quantity,
+              unit_cost: req.cost_per_unit || 0,
+              is_additional: false,
+              notes: '',
+            }))
+          );
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleUpdateEditingQty = (idx: number, newQtyStr: string) => {
+    const val = parseFloat(newQtyStr);
+    setEditingIngredientsList((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], quantity: isNaN(val) ? 0 : val };
+      return next;
+    });
+  };
+
+  const handleRemoveEditingIngredient = (idx: number) => {
+    setEditingIngredientsList((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddEditingExtra = () => {
+    if (!editingSelectedExtraId) return;
+    const qty = parseFloat(editingExtraQty);
+    if (isNaN(qty) || qty <= 0) {
+      alert('Please enter a valid quantity greater than 0');
+      return;
+    }
+    const ing = allIngredients.find((i) => i.id === Number(editingSelectedExtraId));
+    if (!ing) return;
+
+    const existingIdx = editingIngredientsList.findIndex((i) => i.ingredient_id === ing.id);
+    if (existingIdx >= 0) {
+      setEditingIngredientsList((prev) => {
+        const next = [...prev];
+        next[existingIdx] = {
+          ...next[existingIdx],
+          quantity: next[existingIdx].quantity + qty,
+          is_additional: true,
+        };
+        return next;
+      });
+    } else {
+      setEditingIngredientsList((prev) => [
+        ...prev,
+        {
+          ingredient_id: ing.id,
+          ingredient_name: ing.name,
+          unit: ing.unit,
+          quantity: qty,
+          unit_cost: Number(ing.cost_per_unit || 0),
+          is_additional: true,
+          notes: 'Added to batch',
+        },
+      ]);
+    }
+    setEditingSelectedExtraId('');
+    setEditingExtraQty('');
+  };
+
+  const handleSaveIngredientsEdit = async () => {
+    if (!editingIngredientsOrder) return;
+    try {
+      setSavingIngredientsEdit(true);
+      await api.adjustProductionIngredients(editingIngredientsOrder.id, {
+        custom_ingredients: editingIngredientsList.map((item) => ({
+          ingredient_id: item.ingredient_id,
+          quantity: item.quantity,
+          is_additional: item.is_additional,
+          notes: item.notes || '',
+        })),
+        adjustment_reason: editingAdjustmentReason.trim() || 'Manual batch ingredient adjustment',
+        batches_count: Number(editingIngredientsOrder.batches_count),
+        actual_yield: editingIngredientsOrder.actual_yield || editingIngredientsOrder.planned_yield,
+      });
+      setEditingIngredientsOrder(null);
+      await fetchData();
+      alert('Batch ingredients updated successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to update batch ingredients');
+    } finally {
+      setSavingIngredientsEdit(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -495,12 +620,22 @@ export const ProductionPage: React.FC = () => {
                               <span>{undoingId === ord.id ? 'Undoing...' : 'Undo Batch'}</span>
                             </button>
                           ) : ord.status === 'PLANNED' ? (
-                            <button
-                              onClick={() => handleCompleteOrder(ord)}
-                              className="px-2.5 py-1 rounded-lg bg-status-green text-white text-[10px] font-bold hover:bg-status-green/90 shadow-xs"
-                            >
-                              Confirm &amp; Deduct
-                            </button>
+                            <>
+                              <button
+                                onClick={() => openEditIngredientsModal(ord)}
+                                title="Edit batch ingredients (adjust quantities or add extra ingredients)"
+                                className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 hover:bg-amber-500/20 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <Sliders className="w-3 h-3 text-amber-700" />
+                                <span>Edit Ingredients</span>
+                              </button>
+                              <button
+                                onClick={() => handleCompleteOrder(ord)}
+                                className="px-2.5 py-1 rounded-lg bg-status-green text-white text-[10px] font-bold hover:bg-status-green/90 shadow-xs"
+                              >
+                                Confirm &amp; Deduct
+                              </button>
+                            </>
                           ) : (
                             <span className="text-[10px] text-status-red font-semibold px-2 py-0.5 rounded bg-status-redLight border border-status-red/20">
                               Undone
@@ -586,19 +721,85 @@ export const ProductionPage: React.FC = () => {
                       Batches Count *
                     </label>
                     <span className="text-[10px] text-bakery-muted font-normal">
-                      Click to edit / replace
+                      Quick select or type
                     </span>
                   </div>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={batchesCountInput}
-                    onChange={handleBatchInputChange}
-                    onBlur={handleBatchInputBlur}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="Enter batches (e.g. 3)"
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel focus:ring-1 focus:ring-bakery-caramel transition-all"
-                  />
+
+                  {/* Stepper + Input */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = Math.max(1, (parseFloat(batchesCountInput) || 1) - 1);
+                        setBatchesCountInput(String(cur));
+                      }}
+                      className="w-8 h-8 rounded-lg bg-bakery-cream hover:bg-bakery-beige border border-bakery-beige text-bakery-chocolate font-bold flex items-center justify-center shrink-0 active:scale-95"
+                      title="Decrease batch count"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={batchesCountInput}
+                      onChange={handleBatchInputChange}
+                      onBlur={handleBatchInputBlur}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="1"
+                      className="w-full text-center px-2 py-1.5 rounded-lg bg-white border border-bakery-beige text-xs font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel focus:ring-1 focus:ring-bakery-caramel"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = (parseFloat(batchesCountInput) || 0) + 1;
+                        setBatchesCountInput(String(cur));
+                      }}
+                      className="w-8 h-8 rounded-lg bg-bakery-cream hover:bg-bakery-beige border border-bakery-beige text-bakery-chocolate font-bold flex items-center justify-center shrink-0 active:scale-95"
+                      title="Increase batch count"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Quick instant batch preset pills */}
+                  <div className="grid grid-cols-6 gap-1 mt-2">
+                    {[1, 2, 3, 4, 5, 10].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setBatchesCountInput(String(num))}
+                        className={`py-1 rounded-md text-[11px] font-bold border transition-all ${
+                          parseFloat(batchesCountInput) === num
+                            ? 'bg-bakery-chocolate text-white border-bakery-chocolate shadow-xs'
+                            : 'bg-white text-bakery-chocolate border-bakery-beige hover:bg-bakery-cream'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Phone size number dropdown */}
+                  <div className="mt-2 block sm:hidden">
+                    <select
+                      value={[1, 2, 3, 4, 5, 10].includes(Number(batchesCountInput)) ? batchesCountInput : 'custom'}
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          setBatchesCountInput(e.target.value);
+                        }
+                      }}
+                      className="w-full px-2 py-1 rounded-lg bg-white border border-bakery-beige text-xs font-semibold text-bakery-chocolate"
+                    >
+                      <option value="1">1 Batch</option>
+                      <option value="2">2 Batches</option>
+                      <option value="3">3 Batches</option>
+                      <option value="4">4 Batches</option>
+                      <option value="5">5 Batches</option>
+                      <option value="10">10 Batches</option>
+                      <option value="custom">Custom count...</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -957,6 +1158,187 @@ export const ProductionPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Batch Ingredients Modal */}
+      {editingIngredientsOrder && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl bg-bakery-ivory rounded-2xl border border-bakery-beige p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-bakery-beige">
+              <div>
+                <h3 className="font-display font-bold text-lg text-bakery-chocolate flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-bakery-caramel" />
+                  <span>Edit Batch Ingredients</span>
+                </h3>
+                <p className="text-xs text-bakery-muted mt-0.5">
+                  Batch: <strong className="text-bakery-chocolate">{editingIngredientsOrder.production_number}</strong> &bull; {editingIngredientsOrder.product_name} ({editingIngredientsOrder.variant_name}) &bull; {editingIngredientsOrder.batches_count} batch(es)
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingIngredientsOrder(null)}
+                className="p-1 rounded-lg text-bakery-muted hover:text-bakery-chocolate text-base"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4 py-4 text-xs">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Flexible Batch Customization:</strong> Adjust ingredient quantities or add extra supplies (e.g. extra chocolate chips, almonds, flavors). These changes update this batch's cost and stock deduction without altering the master recipe.
+                </span>
+              </div>
+
+              {/* Ingredients Table */}
+              <div className="rounded-xl border border-bakery-beige overflow-hidden bg-white">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-bakery-cream text-[11px] font-bold text-bakery-chocolate border-b border-bakery-beige">
+                    <tr>
+                      <th className="py-2.5 px-3">Ingredient</th>
+                      <th className="py-2.5 px-3 text-right">Batch Qty</th>
+                      <th className="py-2.5 px-3">Unit</th>
+                      <th className="py-2.5 px-3 text-right">Cost/Unit</th>
+                      <th className="py-2.5 px-3 text-right">Total (₱)</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bakery-beige/60">
+                    {editingIngredientsList.map((item, idx) => {
+                      const itemTotal = Number(item.quantity || 0) * Number(item.unit_cost || 0);
+                      return (
+                        <tr key={idx} className="hover:bg-bakery-cream/30">
+                          <td className="py-2 px-3 font-semibold text-bakery-chocolate">
+                            {item.ingredient_name}
+                            {item.is_additional && (
+                              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                Extra
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateEditingQty(idx, e.target.value)}
+                              className="w-20 px-2 py-1 text-right rounded-lg border border-bakery-beige font-bold text-bakery-chocolate focus:border-bakery-caramel focus:outline-hidden"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-bakery-muted font-medium">
+                            {item.unit}
+                          </td>
+                          <td className="py-2 px-3 text-right text-bakery-muted">
+                            ₱{Number(item.unit_cost || 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-bakery-chocolate">
+                            ₱{itemTotal.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditingIngredient(idx)}
+                              title="Remove from batch"
+                              className="p-1 rounded-md text-status-red hover:bg-status-redLight transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Add Extra Ingredient Line */}
+              <div className="p-3 rounded-xl bg-bakery-cream/50 border border-bakery-beige space-y-2">
+                <span className="font-bold text-bakery-chocolate block">
+                  + Add Extra Ingredient to Batch
+                </span>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <select
+                    value={editingSelectedExtraId}
+                    onChange={(e) => setEditingSelectedExtraId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full sm:flex-1 px-3 py-1.5 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
+                  >
+                    <option value="">-- Choose ingredient from pantry --</option>
+                    {allIngredients.map((ing) => (
+                      <option key={ing.id} value={ing.id}>
+                        {ing.name} ({ing.unit}) — Stock: {ing.current_stock}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Qty"
+                    value={editingExtraQty}
+                    onChange={(e) => setEditingExtraQty(e.target.value)}
+                    className="w-full sm:w-24 px-3 py-1.5 rounded-xl bg-white border border-bakery-beige text-xs font-bold text-bakery-chocolate focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEditingExtra}
+                    className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-bakery-chocolate text-white font-semibold hover:bg-[#2c1108] shrink-0"
+                  >
+                    Add to Batch
+                  </button>
+                </div>
+              </div>
+
+              {/* Reason for adjustment */}
+              <div>
+                <label className="block font-semibold text-bakery-chocolate mb-1">
+                  Reason for Batch Customization
+                </label>
+                <input
+                  type="text"
+                  value={editingAdjustmentReason}
+                  onChange={(e) => setEditingAdjustmentReason(e.target.value)}
+                  placeholder="e.g. Added 50g extra chocolate chips per customer request"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden"
+                />
+              </div>
+
+              {/* Cost Summary */}
+              <div className="p-3 rounded-xl bg-bakery-cream border border-bakery-beige flex items-center justify-between">
+                <div>
+                  <span className="text-bakery-muted text-[11px] block">Calculated Batch Cost:</span>
+                  <span className="font-display font-bold text-base text-bakery-chocolate">
+                    ₱{editingIngredientsList.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_cost || 0)), 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-bakery-muted text-[11px] block">Total Ingredients:</span>
+                  <span className="font-bold text-bakery-caramel">
+                    {editingIngredientsList.length} items
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-bakery-beige">
+                <button
+                  type="button"
+                  onClick={() => setEditingIngredientsOrder(null)}
+                  className="px-4 py-2 rounded-xl border border-bakery-beige text-bakery-chocolate hover:bg-bakery-cream font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveIngredientsEdit}
+                  disabled={savingIngredientsEdit}
+                  className="px-5 py-2 rounded-xl bg-bakery-chocolate text-white font-semibold hover:bg-[#2c1108] disabled:opacity-50 shadow-warm-sm"
+                >
+                  {savingIngredientsEdit ? 'Saving Batch...' : 'Save Batch Ingredients'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
