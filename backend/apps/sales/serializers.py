@@ -6,19 +6,35 @@ from .models import (
 
 class FeaturedOrderSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
+    media_type = serializers.SerializerMethodField()
 
     class Meta:
         model = FeaturedOrder
         fields = [
-            'id', 'title', 'description', 'image', 'image_url', 'category',
+            'id', 'title', 'description', 'image', 'image_url', 'media_type', 'category',
             'order_type', 'order_date', 'pieces_count', 'is_featured',
             'is_published', 'display_order', 'created_at', 'updated_at'
         ]
 
+    def get_media_type(self, obj):
+        if obj.image and obj.image.name:
+            name_lower = obj.image.name.lower()
+            if name_lower.endswith(('.mp4', '.mov', '.webm', '.ogg', '.m4v', '.avi')):
+                return 'video'
+        return 'image'
+
     def get_image_url(self, obj):
-        if obj.image:
-            return obj.image.url
-        return None
+        if obj.image and obj.image.name:
+            try:
+                return obj.image.url
+            except Exception:
+                pass
+        cat = (obj.category or '').lower()
+        if 'brownie' in cat:
+            return '/poster-classic-brownies.jpg'
+        if 'cake' in cat or 'banana' in cat:
+            return '/poster-banana-cake.jpg'
+        return '/poster-choco-chip.jpg'
 
 class CustomerReviewSerializer(serializers.ModelSerializer):
     class Meta:

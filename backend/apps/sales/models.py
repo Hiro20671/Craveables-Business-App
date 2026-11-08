@@ -412,7 +412,7 @@ class CustomerPayment(models.Model):
 class FeaturedOrder(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
-    image = models.ImageField(upload_to='featured_orders/')
+    image = models.FileField(upload_to='featured_orders/')
     category = models.CharField(max_length=100, default='Cookies')
     order_type = models.CharField(max_length=100, default='Bulk Order')
     order_date = models.DateField(null=True, blank=True)

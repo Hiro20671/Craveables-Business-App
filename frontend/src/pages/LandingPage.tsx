@@ -932,22 +932,44 @@ export const LandingPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {displayList.map((order) => {
                   const imgSrc = order.image_url || order.image || '/poster-classic-brownies.jpg';
+                  const isVideo =
+                    order.media_type === 'video' ||
+                    /\.(mp4|mov|webm|ogg|m4v|avi)(\?|$)/i.test(imgSrc);
                   return (
                     <div
                       key={order.id}
                       className="bg-white rounded-3xl border border-bakery-beige overflow-hidden shadow-warm-sm hover:shadow-warm-lg transition-all group flex flex-col justify-between"
                     >
                       <div className="relative aspect-square overflow-hidden bg-bakery-cream">
-                        <img
-                          src={imgSrc}
-                          alt={order.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                          onClick={() => setPreviewFeaturedOrder(order)}
-                        />
-                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                        {isVideo ? (
+                          <video
+                            src={imgSrc}
+                            controls
+                            muted
+                            loop
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={imgSrc}
+                            alt={order.title}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = '/poster-choco-chip.jpg';
+                            }}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                            onClick={() => setPreviewFeaturedOrder(order)}
+                          />
+                        )}
+                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 pointer-events-none">
                           <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-bakery-chocolate/90 text-white backdrop-blur-xs">
                             {order.order_type}
                           </span>
+                          {isVideo && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white shadow-2xs">
+                              🎥 Video
+                            </span>
+                          )}
                           {order.pieces_count && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bakery-caramel text-white shadow-2xs">
                               {order.pieces_count} pcs
@@ -957,7 +979,7 @@ export const LandingPage: React.FC = () => {
                         <button
                           onClick={() => setPreviewFeaturedOrder(order)}
                           className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-xs transition-colors"
-                          title="View Full Photo"
+                          title={isVideo ? 'View Full Video' : 'View Full Photo'}
                         >
                           <Maximize2 className="w-3.5 h-3.5" />
                         </button>
@@ -2089,18 +2111,41 @@ export const LandingPage: React.FC = () => {
           >
             {/* Header */}
             <div className="relative aspect-4/3 bg-bakery-chocolate overflow-hidden">
-              <img
-                src={previewFeaturedOrder.image_url || previewFeaturedOrder.image || '/poster-classic-brownies.jpg'}
-                alt={previewFeaturedOrder.title}
-                className="w-full h-full object-cover"
-              />
+              {(() => {
+                const previewSrc =
+                  previewFeaturedOrder.image_url ||
+                  previewFeaturedOrder.image ||
+                  '/poster-classic-brownies.jpg';
+                const isVideo =
+                  previewFeaturedOrder.media_type === 'video' ||
+                  /\.(mp4|mov|webm|ogg|m4v|avi)(\?|$)/i.test(previewSrc);
+                return isVideo ? (
+                  <video
+                    src={previewSrc}
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                    className="w-full h-full object-contain bg-black"
+                  />
+                ) : (
+                  <img
+                    src={previewSrc}
+                    alt={previewFeaturedOrder.title}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/poster-choco-chip.jpg';
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                );
+              })()}
               <button
                 onClick={() => setPreviewFeaturedOrder(null)}
                 className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition-colors shadow-lg"
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2 pointer-events-none">
                 <span className="text-xs font-bold px-3 py-1 rounded-full bg-bakery-chocolate text-white shadow-xs">
                   {previewFeaturedOrder.order_type}
                 </span>

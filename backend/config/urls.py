@@ -5,6 +5,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse, FileResponse, Http404
+from django.views.static import serve as static_serve
 
 
 def serve_spa(request, resource=""):
@@ -97,8 +98,8 @@ def serve_spa(request, resource=""):
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>CRAVEABLES | Business Management System</title>
-    <script type="module" crossorigin src="/assets/index-BP31VShW.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-mMF-5frq.css">
+    <script type="module" crossorigin src="/assets/index-BUO310Ab.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Cs7OyYue.css">
   </head>
   <body class="bg-[#FFF9DF] text-[#17110D]">
     <div id="root"></div>
@@ -123,6 +124,7 @@ urlpatterns = [
     path('api/expenses/', include('apps.expenses.urls')),
     path('api/reports/', include('apps.reports.urls')),
     path('api/settings/', include('apps.settings_app.urls')),
+    re_path(r'^media/(?P<path>.*)$', static_serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

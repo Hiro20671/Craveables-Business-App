@@ -34,11 +34,11 @@ git gc --prune=now 2>/dev/null || true
 # 4. Verify frontend/dist bundle integrity & link zero-byte staticfiles
 echo "🎨 [3/6] Verifying production frontend bundle & linking static assets..."
 mkdir -p frontend/dist/assets
-if [ ! -s "frontend/dist/assets/index-BP31VShW.js" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-BP31VShW.js -o frontend/dist/assets/index-BP31VShW.js
+if [ ! -s "frontend/dist/assets/index-BUO310Ab.js" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-BUO310Ab.js -o frontend/dist/assets/index-BUO310Ab.js
 fi
-if [ ! -s "frontend/dist/assets/index-mMF-5frq.css" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-mMF-5frq.css -o frontend/dist/assets/index-mMF-5frq.css
+if [ ! -s "frontend/dist/assets/index-Cs7OyYue.css" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-Cs7OyYue.css -o frontend/dist/assets/index-Cs7OyYue.css
 fi
 if [ ! -s "frontend/dist/index.html" ]; then
     curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/index.html -o frontend/dist/index.html
@@ -51,8 +51,8 @@ for item in "$REPO_DIR"/frontend/dist/*; do
     ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
 done
 
-echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-BP31VShW.js) bytes"
-echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-mMF-5frq.css) bytes"
+echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-BUO310Ab.js) bytes"
+echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-Cs7OyYue.css) bytes"
 
 # 5. Locate & activate virtual environment
 echo "🐍 [4/6] Activating Python environment..."

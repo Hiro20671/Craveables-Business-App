@@ -561,7 +561,7 @@ export const OrdersPage: React.FC = () => {
   const handleUploadFeatured = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!featFile) {
-      alert('Please select a photo of the completed order');
+      alert('Please select a photo or video of the completed order');
       return;
     }
     if (!featTitle.trim()) {
@@ -583,7 +583,7 @@ export const OrdersPage: React.FC = () => {
       fd.append('is_published', String(featIsPublished));
 
       await api.createFeaturedOrder(fd);
-      alert('Featured order photo uploaded and published to gallery!');
+      alert('Featured order photo/video uploaded and published to gallery!');
       setIsUploadFeaturedOpen(false);
       // Reset
       setFeatTitle('');
@@ -1485,10 +1485,10 @@ export const OrdersPage: React.FC = () => {
                 <span className="text-xs text-bakery-muted">({featuredOrders.length} Completed Orders Displayed)</span>
               </div>
               <h2 className="font-display font-bold text-xl text-bakery-chocolate mt-1">
-                Featured Orders Photo Gallery Manager
+                Featured Orders Photo &amp; Video Gallery Manager
               </h2>
               <p className="text-xs text-bakery-muted max-w-xl">
-                Upload real photos of large corporate cookie boxes, birthday dessert hampers, and custom event bakes to showcase on the public landing page.
+                Upload real photos or videos of large corporate cookie boxes, birthday dessert hampers, and custom event bakes to showcase on the public landing page.
               </p>
             </div>
 
@@ -1497,7 +1497,7 @@ export const OrdersPage: React.FC = () => {
               className="px-4 py-2.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95 flex items-center gap-2 shrink-0"
             >
               <Upload className="w-4 h-4 text-bakery-caramel" />
-              <span>Upload New Featured Bake</span>
+              <span>Upload Photo or Video</span>
             </button>
           </div>
 
@@ -1528,18 +1528,44 @@ export const OrdersPage: React.FC = () => {
                     f.order_type.toLowerCase().includes(featuredCategoryFilter.toLowerCase())
               )
               .map((order) => {
-                const imgSrc = order.image_url || order.image;
+                const imgSrc = order.image_url || order.image || '/poster-choco-chip.jpg';
+                const isVideo =
+                  order.media_type === 'video' ||
+                  /\.(mp4|mov|webm|ogg|m4v|avi)(\?|$)/i.test(imgSrc);
                 return (
                   <div
                     key={order.id}
                     className="bg-bakery-ivory rounded-3xl border border-bakery-beige overflow-hidden shadow-warm-xs hover:shadow-warm-md transition-all flex flex-col justify-between"
                   >
                     <div className="relative aspect-square bg-bakery-cream overflow-hidden">
-                      <img src={imgSrc} alt={order.title} className="w-full h-full object-cover" />
-                      <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+                      {isVideo ? (
+                        <video
+                          src={imgSrc}
+                          controls
+                          muted
+                          loop
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={imgSrc}
+                          alt={order.title}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/poster-choco-chip.jpg';
+                          }}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute top-2 left-2 flex flex-wrap gap-1 pointer-events-none">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bakery-chocolate/90 text-white backdrop-blur-xs">
                           {order.order_type}
                         </span>
+                        {isVideo && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                            🎥 Video
+                          </span>
+                        )}
                         {order.pieces_count && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bakery-caramel text-white">
                             {order.pieces_count} pcs
@@ -2061,14 +2087,14 @@ export const OrdersPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Upload Featured Bake Photo (Section 1B) */}
+      {/* MODAL: Upload Featured Bake Photo or Video (Section 1B) */}
       {isUploadFeaturedOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-bakery-ivory w-full max-w-lg rounded-3xl border border-bakery-beige shadow-warm-lg overflow-hidden animate-fade-in max-h-[90vh] flex flex-col">
             <div className="p-5 bg-bakery-chocolate text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-bakery-caramel" />
-                <h3 className="font-display font-bold text-base">Upload Featured Bake Photo</h3>
+                <h3 className="font-display font-bold text-base">Upload Featured Bake Photo or Video</h3>
               </div>
               <button onClick={() => setIsUploadFeaturedOpen(false)} className="text-bakery-cream/70 hover:text-white font-bold">
                 ✕
@@ -2077,21 +2103,25 @@ export const OrdersPage: React.FC = () => {
 
             <form onSubmit={handleUploadFeatured} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
-                <label className="block font-semibold text-bakery-chocolate mb-1.5">Bake Photo *</label>
+                <label className="block font-semibold text-bakery-chocolate mb-1.5">Bake Photo or Video (JPG, PNG, MP4, MOV) *</label>
                 <div className="border-2 border-dashed border-bakery-beige rounded-2xl p-4 text-center bg-white hover:border-bakery-caramel transition-colors">
                   {featPreviewUrl ? (
-                    <div className="relative aspect-video max-h-48 mx-auto rounded-xl overflow-hidden mb-2">
-                      <img src={featPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="relative aspect-video max-h-48 mx-auto rounded-xl overflow-hidden mb-2 bg-black">
+                      {featFile?.type.startsWith('video/') || /\.(mp4|mov|webm|ogg|m4v)(\?|$)/i.test(featFile?.name || '') ? (
+                        <video src={featPreviewUrl} controls muted loop playsInline className="w-full h-full object-contain" />
+                      ) : (
+                        <img src={featPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                      )}
                     </div>
                   ) : (
                     <div className="py-4 text-bakery-muted flex flex-col items-center gap-2">
                       <ImageIcon className="w-8 h-8 text-bakery-caramel" />
-                      <span>Click to select high-resolution picture of completed bake</span>
+                      <span>Click to select a high-resolution photo or video of the completed bake</span>
                     </div>
                   )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/mp4,video/webm,video/quicktime,video/*"
                     required
                     onChange={handleFeaturedFileChange}
                     className="text-xs text-bakery-chocolate file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-bakery-chocolate file:text-white file:text-xs file:font-bold hover:file:bg-[#2c1108]"

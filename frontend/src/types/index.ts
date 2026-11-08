@@ -329,6 +329,7 @@ export interface FeaturedOrder {
   description: string;
   image: string;
   image_url?: string;
+  media_type?: 'image' | 'video';
   category: string;
   order_type: string;
   order_date: string | null;
