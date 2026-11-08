@@ -4,6 +4,63 @@ from django.utils import timezone
 from decimal import Decimal
 from apps.products.models import ProductVariant
 
+
+def match_product_variant(item_name: str, price=None):
+    """Smart matcher to map inquiry/order item names to the exact ProductVariant."""
+    n = (item_name or '').lower()
+    variants = list(ProductVariant.objects.select_related('product', 'recipe').all())
+    if not variants:
+        return None
+
+    for v in variants:
+        if v.display_name.lower() == n or v.name.lower() == n:
+            return v
+
+    if 'banana' in n:
+        if 'big' in n or '400' in n:
+            for v in variants:
+                if 'banana' in v.product.name.lower() and ('big' in v.name.lower() or '400' in v.name.lower()):
+                    return v
+        if 'small' in n or '120' in n:
+            for v in variants:
+                if 'banana' in v.product.name.lower() and ('small' in v.name.lower() or '120' in v.name.lower()):
+                    return v
+
+    if 'brownie' in n:
+        if 'small' in n or '3' in n:
+            for v in variants:
+                if 'brownie' in v.product.name.lower() and ('3' in v.name.lower() or 'small' in v.name.lower()):
+                    return v
+        if 'big' in n or '6' in n:
+            for v in variants:
+                if 'brownie' in v.product.name.lower() and ('6' in v.name.lower() or 'big' in v.name.lower()):
+                    return v
+
+    if 'cookie' in n or 'velvet' in n or 'choco' in n:
+        is_single = (
+            'single' in n
+            or 'per pc' in n
+            or '1 pc' in n
+            or 'pcs' in n and 'box' not in n
+            or (price is not None and float(price) <= 50)
+        )
+        if 'velvet' in n:
+            for v in variants:
+                if 'velvet' in v.name.lower() and (('single' in v.name.lower()) == is_single):
+                    return v
+        if 'choco' in n or 'classic' in n:
+            for v in variants:
+                if 'choco' in v.name.lower() and (('single' in v.name.lower()) == is_single):
+                    return v
+
+    if price is not None:
+        for v in variants:
+            if abs(float(v.selling_price) - float(price)) < 0.01:
+                return v
+
+    return variants[0]
+
+
 class Customer(models.Model):
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=50, db_index=True)
@@ -38,6 +95,7 @@ class Customer(models.Model):
         total = self.orders.exclude(status='CANCELLED').aggregate(balance=models.Sum('remaining_balance'))['balance'] or Decimal('0.00')
         return round(max(Decimal('0.00'), total), 2)
 
+
 class PaymentMethod(models.TextChoices):
     CASH = 'Cash', 'Cash'
     GCASH = 'GCash', 'GCash'
@@ -45,12 +103,14 @@ class PaymentMethod(models.TextChoices):
     BANK_TRANSFER = 'Bank Transfer', 'Bank Transfer'
     OTHER = 'Other', 'Other'
 
+
 class PaymentStatus(models.TextChoices):
     PAID = 'PAID', 'Fully Paid'
     PARTIALLY_PAID = 'PARTIALLY_PAID', 'Partially Paid'
     UNPAID = 'UNPAID', 'Unpaid'
     DUE_SOON = 'DUE_SOON', 'Due Soon'
     OVERDUE = 'OVERDUE', 'Overdue'
+
 
 class InquiryStatus(models.TextChoices):
     NEW = 'NEW', 'New Order'
@@ -62,6 +122,7 @@ class InquiryStatus(models.TextChoices):
     READY = 'READY', 'Ready for Pickup / Delivery'
     COMPLETED = 'COMPLETED', 'Completed'
     CANCELLED = 'CANCELLED', 'Cancelled'
+
 
 class SaleOrder(models.Model):
     receipt_number = models.CharField(max_length=50, unique=True)
@@ -84,6 +145,7 @@ class SaleOrder(models.Model):
     def __str__(self):
         return f"{self.receipt_number} - ₱{self.total_sales:.2f} ({self.payment_method})"
 
+
 class SaleItem(models.Model):
     sale_order = models.ForeignKey(SaleOrder, on_delete=models.CASCADE, related_name='items')
     product_variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='sales_items')
@@ -103,13 +165,14 @@ class SaleItem(models.Model):
     def __str__(self):
         return f"{self.product_variant.display_name} x {self.quantity}"
 
+
 class CustomerInquiry(models.Model):
     inquiry_number = models.CharField(max_length=50, unique=True)
     shared_order_number = models.CharField(max_length=50, blank=True, default='', db_index=True)
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     customer_name = models.CharField(max_length=150)
     customer_phone = models.CharField(max_length=50)
-    order_type = models.CharField(max_length=50, default='REGULAR', help_text="REGULAR, CUSTOM, BULK, SPECIAL_EVENT")
+    order_type = models.CharField(max_length=50, default='REGULAR', help_text="REGULAR, WHOLESALE, CUSTOM, BULK, SPECIAL_EVENT")
     delivery_method = models.CharField(max_length=20, default='PICKUP', help_text="PICKUP or DELIVERY")
     delivery_address = models.TextField(blank=True, default='')
     special_instructions = models.TextField(blank=True, default='')
@@ -140,17 +203,19 @@ class CustomerInquiry(models.Model):
         if not self.inquiry_number:
             today_str = timezone.now().strftime('%Y%m%d')
             count = CustomerInquiry.objects.filter(created_at__date=timezone.now().date()).count() + 1
-            self.inquiry_number = f"CRV-ORD-{today_str}-{count:04d}"
+            prefix = "CRV-WSL" if self.order_type == 'WHOLESALE' else "CRV-ORD"
+            self.inquiry_number = f"{prefix}-{today_str}-{count:04d}"
         if not self.shared_order_number:
             self.shared_order_number = self.inquiry_number
+
         # Recalculate remaining balance
         est = Decimal(str(self.estimated_total or '0.00'))
         paid = Decimal(str(self.amount_paid or '0.00'))
         self.remaining_balance = max(Decimal('0.00'), est - paid)
 
-        # Automatic status determination
+        # Automatic payment status determination
         today = timezone.now().date()
-        if self.remaining_balance <= 0:
+        if self.remaining_balance <= 0 and est > 0:
             self.payment_status = PaymentStatus.PAID
         elif paid > 0:
             if self.payment_due_date and self.payment_due_date < today:
@@ -169,82 +234,137 @@ class CustomerInquiry(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Auto-connect to SaleOrder when order is completed
-        if self.status == InquiryStatus.COMPLETED and not self.converted_sale_id:
+        # Auto-connect to SaleOrder whenever order is COMPLETED or PAID
+        if self.status != InquiryStatus.CANCELLED and (
+            self.status == InquiryStatus.COMPLETED or self.payment_status == PaymentStatus.PAID
+        ):
             self.auto_create_sale_order()
 
     def auto_create_sale_order(self):
-        """Automatically creates an official SaleOrder and items when order is COMPLETED."""
-        if self.converted_sale_id:
-            return self.converted_sale
-
-        from apps.products.models import ProductVariant
-
+        """Creates or updates the official SaleOrder and SaleItems for a paid or completed order."""
         sale_receipt = self.shared_order_number or self.inquiry_number
-        existing_sale = SaleOrder.objects.filter(receipt_number=sale_receipt).first()
-        if existing_sale:
-            self.converted_sale = existing_sale
-            CustomerInquiry.objects.filter(pk=self.pk).update(converted_sale=existing_sale)
-            return existing_sale
+        sale_order = self.converted_sale
+
+        if not sale_order:
+            sale_order = SaleOrder.objects.filter(receipt_number=sale_receipt).first()
 
         pm = PaymentMethod.CASH
-        if hasattr(self, 'payment_type') and self.payment_type in PaymentMethod.values:
+        latest_payment = self.payments.order_by('-payment_date', '-id').first()
+        if latest_payment and latest_payment.payment_method in PaymentMethod.values:
+            pm = latest_payment.payment_method
+        elif hasattr(self, 'payment_type') and self.payment_type in PaymentMethod.values:
             pm = self.payment_type
         elif hasattr(self, 'payment_type') and 'gcash' in str(self.payment_type).lower():
             pm = PaymentMethod.GCASH
 
-        sale_order = SaleOrder.objects.create(
-            receipt_number=sale_receipt,
-            sale_date=self.target_date or timezone.now().date(),
-            customer=self.customer,
-            customer_name=self.customer_name,
-            payment_method=pm,
-            subtotal=self.estimated_total,
-            discount=Decimal('0.00'),
-            total_sales=self.estimated_total,
-            total_cogs=Decimal('0.00'),
-            gross_profit=self.estimated_total,
-            notes=f"Completed Customer Order {self.shared_order_number or self.inquiry_number}. {self.notes}".strip(),
-        )
+        order_label = "Wholesale Reseller Order" if self.order_type == 'WHOLESALE' else "Customer Order"
 
-        total_cogs = Decimal('0.00')
-        items_data = self.items_json or []
-        for item in items_data:
-            name = item.get('name', '')
-            qty = int(item.get('qty', 1))
-            price = Decimal(str(item.get('price', '0.00')))
+        if not sale_order:
+            sale_order = SaleOrder.objects.create(
+                receipt_number=sale_receipt,
+                sale_date=self.target_date or timezone.now().date(),
+                customer=self.customer,
+                customer_name=self.customer_name,
+                payment_method=pm,
+                subtotal=self.estimated_total,
+                discount=Decimal('0.00'),
+                total_sales=self.estimated_total,
+                total_cogs=Decimal('0.00'),
+                gross_profit=self.estimated_total,
+                notes=f"Completed {order_label} {sale_receipt}. {self.notes}".strip(),
+            )
 
-            variant = ProductVariant.objects.filter(name__icontains=name.split('—')[0].strip()).first()
-            if not variant:
-                variant = ProductVariant.objects.first()
+        # Populate or repair SaleItems if missing
+        if sale_order.items.count() == 0:
+            total_cogs = Decimal('0.00')
+            total_subtotal = Decimal('0.00')
+            total_discount = Decimal('0.00')
+            items_data = self.items_json or []
 
-            unit_cost = Decimal('0.0000')
-            if variant and hasattr(variant, 'recipe') and variant.recipe:
-                unit_cost = variant.recipe.calculated_cost_per_unit
+            for item in items_data:
+                name = item.get('name', '')
+                qty = max(1, int(float(item.get('qty', 1) or 1)))
+                net_unit_price = Decimal(str(item.get('price', '0.00')))
+                reg_unit_price = Decimal(str(item.get('regular_price', net_unit_price)))
+                item_discount = Decimal(str(item.get('discount', max(Decimal('0.00'), (reg_unit_price - net_unit_price) * Decimal(str(qty))))))
 
-            item_cost = unit_cost * Decimal(str(qty))
-            total_cogs += item_cost
+                variant = match_product_variant(name, reg_unit_price)
 
-            if variant:
-                SaleItem.objects.create(
-                    sale_order=sale_order,
-                    product_variant=variant,
-                    quantity=qty,
-                    selling_price=price if price > 0 else variant.selling_price,
-                    discount=Decimal('0.00'),
-                    historical_unit_cost=unit_cost
-                )
+                unit_cost = Decimal('0.0000')
+                if variant and hasattr(variant, 'recipe') and variant.recipe:
+                    unit_cost = variant.recipe.calculated_cost_per_unit
 
-        sale_order.total_cogs = total_cogs
-        sale_order.gross_profit = max(Decimal('0.00'), sale_order.total_sales - total_cogs)
-        sale_order.save()
+                item_cost = unit_cost * Decimal(str(qty))
+                total_cogs += item_cost
+                total_subtotal += (reg_unit_price * Decimal(str(qty)))
+                total_discount += item_discount
 
-        self.converted_sale = sale_order
-        CustomerInquiry.objects.filter(pk=self.pk).update(converted_sale=sale_order)
+                if variant:
+                    SaleItem.objects.create(
+                        sale_order=sale_order,
+                        product_variant=variant,
+                        quantity=qty,
+                        selling_price=reg_unit_price if reg_unit_price > 0 else variant.selling_price,
+                        discount=item_discount,
+                        historical_unit_cost=unit_cost
+                    )
+
+            if items_data:
+                sale_order.subtotal = total_subtotal if total_subtotal > 0 else self.estimated_total
+                sale_order.discount = total_discount
+                sale_order.total_sales = self.estimated_total
+                sale_order.total_cogs = total_cogs
+                sale_order.gross_profit = sale_order.total_sales - total_cogs
+                sale_order.payment_method = pm
+                sale_order.save()
+
+        if self.converted_sale_id != sale_order.id:
+            self.converted_sale = sale_order
+            CustomerInquiry.objects.filter(pk=self.pk).update(converted_sale=sale_order)
+
         return sale_order
 
     def __str__(self):
         return f"{self.inquiry_number} - {self.customer_name} (₱{self.estimated_total:.2f}) [{self.status}]"
+
+
+def sync_all_inquiries_to_sales():
+    """Ensures all completed or paid orders are synced to SaleOrder and stale balances are repaired."""
+    for inq in CustomerInquiry.objects.select_related('converted_sale', 'customer').all():
+        est = Decimal(str(inq.estimated_total or '0.00'))
+        paid = Decimal(str(inq.amount_paid or '0.00'))
+        # If an order was already completed and converted to sale earlier, mark its payment as paid if it was still 0
+        if inq.status == InquiryStatus.COMPLETED and inq.converted_sale_id and paid == 0 and est > 0:
+            paid = est
+            inq.amount_paid = est
+            inq.remaining_balance = Decimal('0.00')
+            inq.payment_status = PaymentStatus.PAID
+            CustomerInquiry.objects.filter(pk=inq.pk).update(
+                amount_paid=est,
+                remaining_balance=Decimal('0.00'),
+                payment_status=PaymentStatus.PAID
+            )
+        else:
+            expected_bal = max(Decimal('0.00'), est - paid)
+            if inq.remaining_balance != expected_bal:
+                inq.remaining_balance = expected_bal
+                p_status = PaymentStatus.PAID if (expected_bal <= 0 and est > 0) else (
+                    PaymentStatus.PARTIALLY_PAID if paid > 0 else PaymentStatus.UNPAID
+                )
+                inq.payment_status = p_status
+                CustomerInquiry.objects.filter(pk=inq.pk).update(
+                    remaining_balance=expected_bal,
+                    payment_status=p_status
+                )
+
+        if inq.status != InquiryStatus.CANCELLED and (
+            inq.status == InquiryStatus.COMPLETED or inq.payment_status == PaymentStatus.PAID
+        ):
+            try:
+                inq.auto_create_sale_order()
+            except Exception:
+                pass
+
 
 class CustomerPayment(models.Model):
     order = models.ForeignKey(CustomerInquiry, on_delete=models.CASCADE, related_name='payments')
@@ -262,6 +382,7 @@ class CustomerPayment(models.Model):
 
     def __str__(self):
         return f"Payment ₱{self.amount:.2f} for {self.order.inquiry_number} via {self.payment_method}"
+
 
 class FeaturedOrder(models.Model):
     title = models.CharField(max_length=200)
@@ -283,6 +404,7 @@ class FeaturedOrder(models.Model):
     def __str__(self):
         return f"{self.title} ({self.order_type}) - {'Published' if self.is_published else 'Draft'}"
 
+
 class CustomerReview(models.Model):
     customer_name = models.CharField(max_length=150)
     customer_location = models.CharField(max_length=150, blank=True, default='')
@@ -297,4 +419,3 @@ class CustomerReview(models.Model):
 
     def __str__(self):
         return f"{self.customer_name} ({self.rating}★) - {'Approved' if self.is_approved else 'Pending'}"
-

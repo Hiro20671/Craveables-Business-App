@@ -35,6 +35,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { name: 'Customer Orders', to: '/orders', icon: ShoppingBag },
+  { name: 'Whole Sales Order', to: '/wholesale-orders', icon: Layers },
   { name: 'Inventory', to: '/inventory', icon: Boxes },
   { name: 'Ingredients', to: '/ingredients', icon: Wheat },
   { name: 'Recipe & Costing', to: '/costing', icon: Calculator },

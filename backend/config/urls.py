@@ -97,8 +97,8 @@ def serve_spa(request, resource=""):
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>CRAVEABLES | Business Management System</title>
-    <script type="module" crossorigin src="/assets/index-Cfx6btse.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-C82v8Dht.css">
+    <script type="module" crossorigin src="/assets/index-BP31VShW.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-mMF-5frq.css">
   </head>
   <body class="bg-[#FFF9DF] text-[#17110D]">
     <div id="root"></div>

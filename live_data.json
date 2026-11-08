@@ -1,122 +1,58 @@
 [
 {
-  "model": "auth.user",
+  "model": "suppliers.supplier",
+  "pk": 1,
   "fields": {
-    "password": "pbkdf2_sha256$870000$k7PImYm2pI8CSHxpsTjk4j$1stNkPhHlim4OXQZn0DtmxCUdv5ycFd9avmdv/kXLkM=",
-    "last_login": null,
-    "is_superuser": true,
-    "username": "dyna",
-    "first_name": "Dyna",
-    "last_name": "Owner",
-    "email": "dyna@craveables.ph",
-    "is_staff": true,
-    "is_active": true,
-    "date_joined": "2026-11-06T13:06:27.857Z",
-    "groups": [],
-    "user_permissions": []
+    "name": "Baking Store",
+    "contact_person": "Baking Store Representative",
+    "phone": "0917-000-0000",
+    "email": "contact@bakingstore.com",
+    "address": "Metro Manila, Philippines",
+    "notes": "",
+    "created_at": "2026-11-06T11:59:39.280Z",
+    "updated_at": "2026-11-08T06:22:16.176Z"
   }
 },
 {
-  "model": "auth.user",
+  "model": "suppliers.supplier",
+  "pk": 2,
   "fields": {
-    "password": "pbkdf2_sha256$870000$10G0kiOFxN9rx0nlq6PzEP$ljuhmcfA72xWP26kxglaxyzEjfCloVKZmzKideYbdWE=",
-    "last_login": null,
-    "is_superuser": true,
-    "username": "jeremy",
-    "first_name": "Jeremy",
-    "last_name": "Owner",
-    "email": "jeremy@craveables.ph",
-    "is_staff": true,
-    "is_active": true,
-    "date_joined": "2026-11-06T13:06:28.634Z",
-    "groups": [],
-    "user_permissions": []
+    "name": "SM",
+    "contact_person": "SM Representative",
+    "phone": "0917-000-0000",
+    "email": "contact@sm.com",
+    "address": "Metro Manila, Philippines",
+    "notes": "",
+    "created_at": "2026-11-06T11:59:39.364Z",
+    "updated_at": "2026-11-08T06:22:16.222Z"
   }
 },
 {
-  "model": "auth.user",
-  "fields": {
-    "password": "pbkdf2_sha256$870000$GuZH3DsqMx3uWWRUy3xXnm$+yH4un5sPvIfdIigKccYi4bnCQhJjwtKwBGnEADBO8A=",
-    "last_login": null,
-    "is_superuser": true,
-    "username": "anne",
-    "first_name": "Anne",
-    "last_name": "Owner",
-    "email": "anne@craveables.ph",
-    "is_staff": true,
-    "is_active": true,
-    "date_joined": "2026-11-06T13:06:29.432Z",
-    "groups": [],
-    "user_permissions": []
-  }
-},
-{
-  "model": "authtoken.token",
-  "pk": "28a7dc5aff16d13b646a0eb9ae3ff2fc83a15452",
-  "fields": {
-    "user": [
-      "jeremy"
-    ],
-    "created": "2026-11-06T13:12:14.682Z"
-  }
-},
-{
-  "model": "authtoken.token",
-  "pk": "432a2400747a1672de153d5e85c4371724a5042d",
-  "fields": {
-    "user": [
-      "anne"
-    ],
-    "created": "2026-11-06T13:18:52.703Z"
-  }
-},
-{
-  "model": "authtoken.token",
-  "pk": "8bcd1c3c40e612a07f5e47990c16747e753b9662",
-  "fields": {
-    "user": [
-      "dyna"
-    ],
-    "created": "2026-11-06T13:18:25.437Z"
-  }
-},
-{
-  "model": "accounts.userprofile",
+  "model": "suppliers.supplier",
   "pk": 3,
   "fields": {
-    "user": [
-      "dyna"
-    ],
-    "role": "ADMIN",
-    "phone_number": null,
-    "created_at": "2026-11-06T13:06:27.857Z",
-    "updated_at": "2026-11-06T16:29:32.782Z"
+    "name": "Online",
+    "contact_person": "Online Representative",
+    "phone": "0917-000-0000",
+    "email": "contact@online.com",
+    "address": "Metro Manila, Philippines",
+    "notes": "",
+    "created_at": "2026-11-06T11:59:39.380Z",
+    "updated_at": "2026-11-08T06:22:16.207Z"
   }
 },
 {
-  "model": "accounts.userprofile",
+  "model": "suppliers.supplier",
   "pk": 4,
   "fields": {
-    "user": [
-      "jeremy"
-    ],
-    "role": "ADMIN",
-    "phone_number": null,
-    "created_at": "2026-11-06T13:06:28.637Z",
-    "updated_at": "2026-11-06T16:29:33.516Z"
-  }
-},
-{
-  "model": "accounts.userprofile",
-  "pk": 5,
-  "fields": {
-    "user": [
-      "anne"
-    ],
-    "role": "ADMIN",
-    "phone_number": null,
-    "created_at": "2026-11-06T13:06:29.432Z",
-    "updated_at": "2026-11-06T16:29:34.232Z"
+    "name": "Market",
+    "contact_person": "Market Representative",
+    "phone": "0917-000-0000",
+    "email": "contact@market.com",
+    "address": "Metro Manila, Philippines",
+    "notes": "",
+    "created_at": "2026-11-06T11:59:39.406Z",
+    "updated_at": "2026-11-08T06:22:16.192Z"
   }
 },
 {
@@ -510,9 +446,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.431Z"
   }
 },
@@ -527,9 +461,7 @@
     "new_stock": "250.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.463Z"
   }
 },
@@ -544,9 +476,7 @@
     "new_stock": "100.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.497Z"
   }
 },
@@ -561,9 +491,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.536Z"
   }
 },
@@ -578,9 +506,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.564Z"
   }
 },
@@ -595,9 +521,7 @@
     "new_stock": "36.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.597Z"
   }
 },
@@ -612,9 +536,7 @@
     "new_stock": "150.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.628Z"
   }
 },
@@ -629,9 +551,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.647Z"
   }
 },
@@ -646,9 +566,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.680Z"
   }
 },
@@ -663,9 +581,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.713Z"
   }
 },
@@ -680,9 +596,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.747Z"
   }
 },
@@ -697,9 +611,7 @@
     "new_stock": "200.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.780Z"
   }
 },
@@ -714,9 +626,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.813Z"
   }
 },
@@ -731,9 +641,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.845Z"
   }
 },
@@ -748,9 +656,7 @@
     "new_stock": "350.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.864Z"
   }
 },
@@ -765,9 +671,7 @@
     "new_stock": "1.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.904Z"
   }
 },
@@ -782,9 +686,7 @@
     "new_stock": "1000.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.933Z"
   }
 },
@@ -799,9 +701,7 @@
     "new_stock": "250.00",
     "reason": "Initial stock imported from Excel workbook",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T11:59:39.977Z"
   }
 },
@@ -816,9 +716,7 @@
     "new_stock": "640.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -833,9 +731,7 @@
     "new_stock": "95.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -850,9 +746,7 @@
     "new_stock": "880.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -867,9 +761,7 @@
     "new_stock": "880.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -884,9 +776,7 @@
     "new_stock": "147.50",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -901,9 +791,7 @@
     "new_stock": "31.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -918,9 +806,7 @@
     "new_stock": "940.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.396Z"
   }
 },
@@ -935,9 +821,7 @@
     "new_stock": "240.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.406Z"
   }
 },
@@ -952,9 +836,7 @@
     "new_stock": "880.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.406Z"
   }
 },
@@ -969,9 +851,7 @@
     "new_stock": "340.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.406Z"
   }
 },
@@ -986,9 +866,7 @@
     "new_stock": "880.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.412Z"
   }
 },
@@ -1003,9 +881,7 @@
     "new_stock": "0.00",
     "reason": "Production PRD-20261106130357 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:04:08.414Z"
   }
 },
@@ -1020,9 +896,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.955Z"
   }
 },
@@ -1037,9 +911,7 @@
     "new_stock": "100.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.969Z"
   }
 },
@@ -1054,9 +926,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.970Z"
   }
 },
@@ -1071,9 +941,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.971Z"
   }
 },
@@ -1088,9 +956,7 @@
     "new_stock": "150.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.972Z"
   }
 },
@@ -1105,9 +971,7 @@
     "new_stock": "36.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.974Z"
   }
 },
@@ -1122,9 +986,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.974Z"
   }
 },
@@ -1139,9 +1001,7 @@
     "new_stock": "250.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.974Z"
   }
 },
@@ -1156,9 +1016,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.974Z"
   }
 },
@@ -1173,9 +1031,7 @@
     "new_stock": "350.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.977Z"
   }
 },
@@ -1190,9 +1046,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.977Z"
   }
 },
@@ -1207,9 +1061,7 @@
     "new_stock": "1.00",
     "reason": "Undo/Revert batch PRD-20261106130357 - ingredients restored",
     "reference_id": "PRD-20261106130357",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:41:49.977Z"
   }
 },
@@ -1224,9 +1076,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.534Z"
   }
 },
@@ -1241,9 +1091,7 @@
     "new_stock": "95.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.535Z"
   }
 },
@@ -1258,9 +1106,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.537Z"
   }
 },
@@ -1275,9 +1121,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.539Z"
   }
 },
@@ -1292,9 +1136,7 @@
     "new_stock": "147.50",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.540Z"
   }
 },
@@ -1309,9 +1151,7 @@
     "new_stock": "31.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.542Z"
   }
 },
@@ -1326,9 +1166,7 @@
     "new_stock": "940.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.543Z"
   }
 },
@@ -1343,9 +1181,7 @@
     "new_stock": "240.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.545Z"
   }
 },
@@ -1360,9 +1196,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.547Z"
   }
 },
@@ -1377,9 +1211,7 @@
     "new_stock": "340.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.549Z"
   }
 },
@@ -1394,9 +1226,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.551Z"
   }
 },
@@ -1411,9 +1241,7 @@
     "new_stock": "0.00",
     "reason": "Production batch PRD-20261106134225 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:25.552Z"
   }
 },
@@ -1428,9 +1256,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.478Z"
   }
 },
@@ -1445,9 +1271,7 @@
     "new_stock": "100.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.479Z"
   }
 },
@@ -1462,9 +1286,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.480Z"
   }
 },
@@ -1479,9 +1301,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.480Z"
   }
 },
@@ -1496,9 +1316,7 @@
     "new_stock": "150.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.481Z"
   }
 },
@@ -1513,9 +1331,7 @@
     "new_stock": "36.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.482Z"
   }
 },
@@ -1530,9 +1346,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.482Z"
   }
 },
@@ -1547,9 +1361,7 @@
     "new_stock": "250.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.483Z"
   }
 },
@@ -1564,9 +1376,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.483Z"
   }
 },
@@ -1581,9 +1391,7 @@
     "new_stock": "350.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.485Z"
   }
 },
@@ -1598,9 +1406,7 @@
     "new_stock": "1000.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.485Z"
   }
 },
@@ -1615,9 +1421,7 @@
     "new_stock": "1.00",
     "reason": "Undo/Revert batch PRD-20261106134225 - ingredients restored",
     "reference_id": "PRD-20261106134225",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-06T13:42:56.485Z"
   }
 },
@@ -1632,9 +1436,7 @@
     "new_stock": "250.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.288Z"
   }
 },
@@ -1649,9 +1451,7 @@
     "new_stock": "200.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.273Z"
   }
 },
@@ -1666,9 +1466,7 @@
     "new_stock": "3000.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.256Z"
   }
 },
@@ -1683,9 +1481,7 @@
     "new_stock": "600.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.240Z"
   }
 },
@@ -1700,9 +1496,7 @@
     "new_stock": "30.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.223Z"
   }
 },
@@ -1717,9 +1511,7 @@
     "new_stock": "350.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.204Z"
   }
 },
@@ -1734,9 +1526,7 @@
     "new_stock": "2000.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.186Z"
   }
 },
@@ -1751,9 +1541,7 @@
     "new_stock": "376.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.169Z"
   }
 },
@@ -1768,9 +1556,7 @@
     "new_stock": "3000.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.151Z"
   }
 },
@@ -1785,9 +1571,7 @@
     "new_stock": "467.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.133Z"
   }
 },
@@ -1802,9 +1586,7 @@
     "new_stock": "900.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.115Z"
   }
 },
@@ -1819,9 +1601,7 @@
     "new_stock": "1000.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.099Z"
   }
 },
@@ -1836,9 +1616,7 @@
     "new_stock": "88.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.082Z"
   }
 },
@@ -1853,9 +1631,7 @@
     "new_stock": "700.00",
     "reason": "Physical inventory audit",
     "reference_id": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.065Z"
   }
 },
@@ -1870,9 +1646,7 @@
     "new_stock": "2520.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.049Z"
   }
 },
@@ -1887,9 +1661,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.031Z"
   }
 },
@@ -1904,9 +1676,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:20.013Z"
   }
 },
@@ -1921,9 +1691,7 @@
     "new_stock": "147.50",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.989Z"
   }
 },
@@ -1938,9 +1706,7 @@
     "new_stock": "900.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.973Z"
   }
 },
@@ -1955,9 +1721,7 @@
     "new_stock": "950.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.954Z"
   }
 },
@@ -1972,9 +1736,7 @@
     "new_stock": "500.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.938Z"
   }
 },
@@ -1989,9 +1751,7 @@
     "new_stock": "29.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.917Z"
   }
 },
@@ -2006,9 +1766,7 @@
     "new_stock": "457.00",
     "reason": "Production batch PRD-20261107094647 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107094647",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.900Z"
   }
 },
@@ -2023,9 +1781,7 @@
     "new_stock": "2040.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.884Z"
   }
 },
@@ -2040,9 +1796,7 @@
     "new_stock": "316.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.863Z"
   }
 },
@@ -2057,9 +1811,7 @@
     "new_stock": "760.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.845Z"
   }
 },
@@ -2074,9 +1826,7 @@
     "new_stock": "760.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.830Z"
   }
 },
@@ -2091,9 +1841,7 @@
     "new_stock": "145.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.813Z"
   }
 },
@@ -2108,9 +1856,7 @@
     "new_stock": "840.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.796Z"
   }
 },
@@ -2125,9 +1871,7 @@
     "new_stock": "900.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.780Z"
   }
 },
@@ -2142,9 +1886,7 @@
     "new_stock": "400.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.762Z"
   }
 },
@@ -2159,9 +1901,7 @@
     "new_stock": "28.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.746Z"
   }
 },
@@ -2176,9 +1916,7 @@
     "new_stock": "25.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.730Z"
   }
 },
@@ -2193,9 +1931,7 @@
     "new_stock": "447.00",
     "reason": "Production PRD-20261107101301 for Cookies — Red Velvet Cookies",
     "reference_id": "PRD-20261107101301",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.712Z"
   }
 },
@@ -2210,9 +1946,7 @@
     "new_stock": "1560.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.696Z"
   }
 },
@@ -2227,9 +1961,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.673Z"
   }
 },
@@ -2244,9 +1976,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.654Z"
   }
 },
@@ -2261,9 +1991,7 @@
     "new_stock": "142.50",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.638Z"
   }
 },
@@ -2278,9 +2006,7 @@
     "new_stock": "740.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.622Z"
   }
 },
@@ -2295,9 +2021,7 @@
     "new_stock": "850.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.602Z"
   }
 },
@@ -2312,9 +2036,7 @@
     "new_stock": "300.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.585Z"
   }
 },
@@ -2329,9 +2051,7 @@
     "new_stock": "27.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.569Z"
   }
 },
@@ -2346,9 +2066,7 @@
     "new_stock": "437.00",
     "reason": "Production batch PRD-20261107102407 for Cookies — Choco Chip Box",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.552Z"
   }
 },
@@ -2363,9 +2081,7 @@
     "new_stock": "2040.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.536Z"
   }
 },
@@ -2380,9 +2096,7 @@
     "new_stock": "760.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.519Z"
   }
 },
@@ -2397,9 +2111,7 @@
     "new_stock": "760.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.502Z"
   }
 },
@@ -2414,9 +2126,7 @@
     "new_stock": "145.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.484Z"
   }
 },
@@ -2431,9 +2141,7 @@
     "new_stock": "840.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.467Z"
   }
 },
@@ -2448,9 +2156,7 @@
     "new_stock": "900.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.450Z"
   }
 },
@@ -2465,9 +2171,7 @@
     "new_stock": "400.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.433Z"
   }
 },
@@ -2482,9 +2186,7 @@
     "new_stock": "28.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.415Z"
   }
 },
@@ -2499,9 +2201,7 @@
     "new_stock": "447.00",
     "reason": "Undo/Revert batch PRD-20261107102407 - ingredients restored",
     "reference_id": "PRD-20261107102407",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.397Z"
   }
 },
@@ -2516,9 +2216,7 @@
     "new_stock": "1680.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.379Z"
   }
 },
@@ -2533,9 +2231,7 @@
     "new_stock": "169.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.362Z"
   }
 },
@@ -2550,9 +2246,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.343Z"
   }
 },
@@ -2567,9 +2261,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.325Z"
   }
 },
@@ -2584,9 +2276,7 @@
     "new_stock": "142.50",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.308Z"
   }
 },
@@ -2601,9 +2291,7 @@
     "new_stock": "31.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.286Z"
   }
 },
@@ -2618,9 +2306,7 @@
     "new_stock": "840.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.269Z"
   }
 },
@@ -2635,9 +2321,7 @@
     "new_stock": "240.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.252Z"
   }
 },
@@ -2652,9 +2336,7 @@
     "new_stock": "780.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.234Z"
   }
 },
@@ -2669,9 +2351,7 @@
     "new_stock": "437.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.215Z"
   }
 },
@@ -2686,9 +2366,7 @@
     "new_stock": "880.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.196Z"
   }
 },
@@ -2703,9 +2381,7 @@
     "new_stock": "27.00",
     "reason": "Production batch PRD-20261107102509 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102509",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.179Z"
   }
 },
@@ -2720,9 +2396,7 @@
     "new_stock": "1320.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.162Z"
   }
 },
@@ -2737,9 +2411,7 @@
     "new_stock": "164.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.145Z"
   }
 },
@@ -2754,9 +2426,7 @@
     "new_stock": "520.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.128Z"
   }
 },
@@ -2771,9 +2441,7 @@
     "new_stock": "520.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.111Z"
   }
 },
@@ -2788,9 +2456,7 @@
     "new_stock": "140.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.093Z"
   }
 },
@@ -2805,9 +2471,7 @@
     "new_stock": "26.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.076Z"
   }
 },
@@ -2822,9 +2486,7 @@
     "new_stock": "780.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.057Z"
   }
 },
@@ -2839,9 +2501,7 @@
     "new_stock": "230.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.041Z"
   }
 },
@@ -2856,9 +2516,7 @@
     "new_stock": "660.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.023Z"
   }
 },
@@ -2873,9 +2531,7 @@
     "new_stock": "427.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:19.007Z"
   }
 },
@@ -2890,9 +2546,7 @@
     "new_stock": "760.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.989Z"
   }
 },
@@ -2907,9 +2561,7 @@
     "new_stock": "26.00",
     "reason": "Production batch PRD-20261107102513 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102513",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.973Z"
   }
 },
@@ -2924,9 +2576,7 @@
     "new_stock": "960.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.956Z"
   }
 },
@@ -2941,9 +2591,7 @@
     "new_stock": "159.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.940Z"
   }
 },
@@ -2958,9 +2606,7 @@
     "new_stock": "400.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.921Z"
   }
 },
@@ -2975,9 +2621,7 @@
     "new_stock": "400.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.902Z"
   }
 },
@@ -2992,9 +2636,7 @@
     "new_stock": "137.50",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.885Z"
   }
 },
@@ -3009,9 +2651,7 @@
     "new_stock": "21.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.867Z"
   }
 },
@@ -3026,9 +2666,7 @@
     "new_stock": "720.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.844Z"
   }
 },
@@ -3043,9 +2681,7 @@
     "new_stock": "220.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.828Z"
   }
 },
@@ -3060,9 +2696,7 @@
     "new_stock": "540.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.811Z"
   }
 },
@@ -3077,9 +2711,7 @@
     "new_stock": "417.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.795Z"
   }
 },
@@ -3094,9 +2726,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.777Z"
   }
 },
@@ -3111,9 +2741,7 @@
     "new_stock": "25.00",
     "reason": "Production batch PRD-20261107102516 for Banana Cake — Big (400g)",
     "reference_id": "PRD-20261107102516",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.760Z"
   }
 },
@@ -3128,9 +2756,7 @@
     "new_stock": "885.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.745Z"
   }
 },
@@ -3145,9 +2771,7 @@
     "new_stock": "281.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.728Z"
   }
 },
@@ -3162,9 +2786,7 @@
     "new_stock": "300.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.711Z"
   }
 },
@@ -3179,9 +2801,7 @@
     "new_stock": "300.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.693Z"
   }
 },
@@ -3196,9 +2816,7 @@
     "new_stock": "135.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.675Z"
   }
 },
@@ -3213,9 +2831,7 @@
     "new_stock": "640.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.658Z"
   }
 },
@@ -3230,9 +2846,7 @@
     "new_stock": "300.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.641Z"
   }
 },
@@ -3247,9 +2861,7 @@
     "new_stock": "22.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.623Z"
   }
 },
@@ -3264,9 +2876,7 @@
     "new_stock": "407.00",
     "reason": "Production batch PRD-20261107114001 for Classic Brownies — Box of 6",
     "reference_id": "PRD-20261107114001",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.607Z"
   }
 },
@@ -3281,9 +2891,7 @@
     "new_stock": "810.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.588Z"
   }
 },
@@ -3298,9 +2906,7 @@
     "new_stock": "246.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.573Z"
   }
 },
@@ -3315,9 +2921,7 @@
     "new_stock": "200.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.553Z"
   }
 },
@@ -3332,9 +2936,7 @@
     "new_stock": "200.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.539Z"
   }
 },
@@ -3349,9 +2951,7 @@
     "new_stock": "132.50",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.521Z"
   }
 },
@@ -3366,9 +2966,7 @@
     "new_stock": "440.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.502Z"
   }
 },
@@ -3383,9 +2981,7 @@
     "new_stock": "200.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.485Z"
   }
 },
@@ -3400,9 +2996,7 @@
     "new_stock": "19.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.465Z"
   }
 },
@@ -3417,9 +3011,7 @@
     "new_stock": "397.00",
     "reason": "Production batch PRD-20261107114203 for Classic Brownies — Box of 3",
     "reference_id": "PRD-20261107114203",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:18.441Z"
   }
 },
@@ -4778,9 +4370,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:52.684Z",
     "completed_at": null
   }
@@ -4805,9 +4395,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:52.362Z",
     "completed_at": null
   }
@@ -4832,9 +4420,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:52.144Z",
     "completed_at": null
   }
@@ -4859,9 +4445,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:51.912Z",
     "completed_at": null
   }
@@ -4886,9 +4470,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:51.684Z",
     "completed_at": null
   }
@@ -4913,9 +4495,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:51.510Z",
     "completed_at": null
   }
@@ -4940,9 +4520,7 @@
     "is_customized": false,
     "adjustment_reason": "",
     "adjusted_by": null,
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:51.327Z",
     "completed_at": null
   }
@@ -6152,16 +5730,14 @@
     "sale_date": "2026-11-08",
     "customer_name": "DP",
     "customer": null,
-    "payment_method": "GCash",
+    "payment_method": "Cash",
     "subtotal": "110.00",
     "discount": "0.00",
     "total_sales": "110.00",
-    "total_cogs": "0.00",
-    "gross_profit": "110.00",
+    "total_cogs": "76.66",
+    "gross_profit": "33.34",
     "notes": "Converted from Online Order Inquiry INQ-20261108025734.",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:53.599Z"
   }
 },
@@ -6177,12 +5753,10 @@
     "subtotal": "220.00",
     "discount": "0.00",
     "total_sales": "220.00",
-    "total_cogs": "0.00",
-    "gross_profit": "220.00",
+    "total_cogs": "157.22",
+    "gross_profit": "62.78",
     "notes": "Converted from Online Order Inquiry INQ-20261106164440.",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:53.580Z"
   }
 },
@@ -6198,12 +5772,10 @@
     "subtotal": "135.00",
     "discount": "0.00",
     "total_sales": "135.00",
-    "total_cogs": "0.00",
-    "gross_profit": "135.00",
+    "total_cogs": "88.03",
+    "gross_profit": "46.97",
     "notes": "Converted from Online Order Inquiry INQ-20261108033230.",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:20:53.563Z"
   }
 },
@@ -6219,8 +5791,8 @@
     "subtotal": "110.00",
     "discount": "0.00",
     "total_sales": "110.00",
-    "total_cogs": "43.53",
-    "gross_profit": "66.47",
+    "total_cogs": "76.66",
+    "gross_profit": "33.34",
     "notes": "Completed Customer Order INQ-20261108030006.",
     "created_by": null,
     "created_at": "2026-11-08T06:53:54.246Z"
@@ -6228,16 +5800,58 @@
 },
 {
   "model": "sales.saleitem",
-  "pk": 11,
+  "pk": 12,
   "fields": {
-    "sale_order": 9,
-    "product_variant": 1,
+    "sale_order": 6,
+    "product_variant": 4,
     "quantity": 1,
     "selling_price": "110.00",
     "discount": "0.00",
     "total_price": "110.00",
-    "historical_unit_cost": "43.5306",
-    "gross_profit": "66.47"
+    "historical_unit_cost": "76.6577",
+    "gross_profit": "33.34"
+  }
+},
+{
+  "model": "sales.saleitem",
+  "pk": 13,
+  "fields": {
+    "sale_order": 9,
+    "product_variant": 4,
+    "quantity": 1,
+    "selling_price": "110.00",
+    "discount": "0.00",
+    "total_price": "110.00",
+    "historical_unit_cost": "76.6577",
+    "gross_profit": "33.34"
+  }
+},
+{
+  "model": "sales.saleitem",
+  "pk": 14,
+  "fields": {
+    "sale_order": 8,
+    "product_variant": 2,
+    "quantity": 1,
+    "selling_price": "135.00",
+    "discount": "0.00",
+    "total_price": "135.00",
+    "historical_unit_cost": "88.0278",
+    "gross_profit": "46.97"
+  }
+},
+{
+  "model": "sales.saleitem",
+  "pk": 15,
+  "fields": {
+    "sale_order": 7,
+    "product_variant": 3,
+    "quantity": 1,
+    "selling_price": "220.00",
+    "discount": "0.00",
+    "total_price": "220.00",
+    "historical_unit_cost": "157.2154",
+    "gross_profit": "62.78"
   }
 },
 {
@@ -6269,7 +5883,7 @@
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
     "amount_paid": "0.00",
-    "remaining_balance": "0.00",
+    "remaining_balance": "270.00",
     "payment_due_date": null,
     "payment_status": "UNPAID",
     "payment_notes": "",
@@ -6311,7 +5925,7 @@
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
     "amount_paid": "0.00",
-    "remaining_balance": "1500.00",
+    "remaining_balance": "245.00",
     "payment_due_date": null,
     "payment_status": "UNPAID",
     "payment_notes": "",
@@ -6347,10 +5961,10 @@
     "converted_sale": 7,
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
-    "amount_paid": "0.00",
-    "remaining_balance": "1500.00",
+    "amount_paid": "220.00",
+    "remaining_balance": "0.00",
     "payment_due_date": null,
-    "payment_status": "UNPAID",
+    "payment_status": "PAID",
     "payment_notes": "",
     "created_at": "2026-11-08T03:35:52.580Z",
     "updated_at": "2026-11-08T06:22:33.029Z"
@@ -6384,10 +5998,10 @@
     "converted_sale": 6,
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
-    "amount_paid": "0.00",
-    "remaining_balance": "110.00",
+    "amount_paid": "110.00",
+    "remaining_balance": "0.00",
     "payment_due_date": null,
-    "payment_status": "UNPAID",
+    "payment_status": "PAID",
     "payment_notes": "",
     "created_at": "2026-11-08T06:20:54.473Z",
     "updated_at": "2026-11-08T06:22:33.014Z"
@@ -6421,10 +6035,10 @@
     "converted_sale": 9,
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
-    "amount_paid": "0.00",
-    "remaining_balance": "110.00",
+    "amount_paid": "110.00",
+    "remaining_balance": "0.00",
     "payment_due_date": null,
-    "payment_status": "UNPAID",
+    "payment_status": "PAID",
     "payment_notes": "",
     "created_at": "2026-11-08T06:20:54.455Z",
     "updated_at": "2026-11-08T06:53:54.212Z"
@@ -6532,10 +6146,10 @@
     "converted_sale": 8,
     "payment_type": "PAY_ON_PICKUP",
     "initial_deposit": "0.00",
-    "amount_paid": "0.00",
-    "remaining_balance": "135.00",
+    "amount_paid": "135.00",
+    "remaining_balance": "0.00",
     "payment_due_date": null,
-    "payment_status": "UNPAID",
+    "payment_status": "PAID",
     "payment_notes": "",
     "created_at": "2026-11-08T06:20:54.403Z",
     "updated_at": "2026-11-08T06:22:32.949Z"
@@ -6782,9 +6396,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.986Z"
   }
 },
@@ -6799,9 +6411,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.972Z"
   }
 },
@@ -6816,9 +6426,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.958Z"
   }
 },
@@ -6833,9 +6441,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.942Z"
   }
 },
@@ -6850,9 +6456,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.744Z"
   }
 },
@@ -6867,9 +6471,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:33.926Z"
   }
 },
@@ -6884,9 +6486,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:34.035Z"
   }
 },
@@ -6901,9 +6501,7 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:34.018Z"
   }
 },
@@ -6918,66 +6516,8 @@
     "payment_method": "Cash",
     "receipt_reference": "",
     "notes": "",
-    "created_by": [
-      "dyna"
-    ],
+    "created_by": 3,
     "created_at": "2026-11-08T06:22:34.001Z"
-  }
-},
-{
-  "model": "suppliers.supplier",
-  "pk": 1,
-  "fields": {
-    "name": "Baking Store",
-    "contact_person": "Baking Store Representative",
-    "phone": "0917-000-0000",
-    "email": "contact@bakingstore.com",
-    "address": "Metro Manila, Philippines",
-    "notes": "",
-    "created_at": "2026-11-06T11:59:39.280Z",
-    "updated_at": "2026-11-08T06:22:16.176Z"
-  }
-},
-{
-  "model": "suppliers.supplier",
-  "pk": 2,
-  "fields": {
-    "name": "SM",
-    "contact_person": "SM Representative",
-    "phone": "0917-000-0000",
-    "email": "contact@sm.com",
-    "address": "Metro Manila, Philippines",
-    "notes": "",
-    "created_at": "2026-11-06T11:59:39.364Z",
-    "updated_at": "2026-11-08T06:22:16.222Z"
-  }
-},
-{
-  "model": "suppliers.supplier",
-  "pk": 3,
-  "fields": {
-    "name": "Online",
-    "contact_person": "Online Representative",
-    "phone": "0917-000-0000",
-    "email": "contact@online.com",
-    "address": "Metro Manila, Philippines",
-    "notes": "",
-    "created_at": "2026-11-06T11:59:39.380Z",
-    "updated_at": "2026-11-08T06:22:16.207Z"
-  }
-},
-{
-  "model": "suppliers.supplier",
-  "pk": 4,
-  "fields": {
-    "name": "Market",
-    "contact_person": "Market Representative",
-    "phone": "0917-000-0000",
-    "email": "contact@market.com",
-    "address": "Metro Manila, Philippines",
-    "notes": "",
-    "created_at": "2026-11-06T11:59:39.406Z",
-    "updated_at": "2026-11-08T06:22:16.192Z"
   }
 },
 {

@@ -20,7 +20,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from .models import (
     SaleOrder, SaleItem, PaymentMethod, CustomerInquiry, InquiryStatus,
-    CustomerReview, Customer, CustomerPayment, PaymentStatus, FeaturedOrder
+    CustomerReview, Customer, CustomerPayment, PaymentStatus, FeaturedOrder,
+    match_product_variant, sync_all_inquiries_to_sales
 )
 from .serializers import (
     SaleOrderSerializer, SaleItemSerializer, CustomerInquirySerializer,
@@ -234,16 +235,7 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     serializer_class = SaleOrderSerializer
 
     def get_queryset(self):
-        # Auto-convert any completed customer inquiries into official sale orders
-        completed_inquiries = CustomerInquiry.objects.filter(
-            status=InquiryStatus.COMPLETED,
-            converted_sale__isnull=True
-        )
-        for inq in completed_inquiries:
-            try:
-                inq.auto_create_sale_order()
-            except Exception:
-                pass
+        sync_all_inquiries_to_sales()
 
         qs = super().get_queryset()
         start_date = self.request.query_params.get('start_date')
@@ -363,31 +355,22 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary_metrics(self, request):
-        # Auto-convert any completed customer inquiries first
-        completed_inquiries = CustomerInquiry.objects.filter(
-            status=InquiryStatus.COMPLETED,
-            converted_sale__isnull=True
-        )
-        for inq in completed_inquiries:
-            try:
-                inq.auto_create_sale_order()
-            except Exception:
-                pass
+        sync_all_inquiries_to_sales()
 
         qs = self.get_queryset()
         totals = qs.aggregate(
-            total_sales=Sum('total_sales'),
-            total_gross_profit=Sum('gross_profit'),
-            total_cogs=Sum('total_cogs'),
+            sum_total_sales=Sum('total_sales'),
+            sum_gross_profit=Sum('gross_profit'),
+            sum_total_cogs=Sum('total_cogs'),
             orders_count=Count('id'),
             avg_sale=Avg('total_sales')
         )
         total_units = SaleItem.objects.filter(sale_order__in=qs).aggregate(units=Sum('quantity'))['units'] or 0
 
         return Response({
-            'total_sales': totals['total_sales'] or 0.00,
-            'total_gross_profit': totals['total_gross_profit'] or 0.00,
-            'total_cogs': totals['total_cogs'] or 0.00,
+            'total_sales': totals['sum_total_sales'] or 0.00,
+            'total_gross_profit': totals['sum_gross_profit'] or 0.00,
+            'total_cogs': totals['sum_total_cogs'] or 0.00,
             'orders_count': totals['orders_count'] or 0,
             'average_sale': round(totals['avg_sale'] or 0.00, 2),
             'total_units_sold': total_units,
@@ -525,9 +508,12 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        sync_all_inquiries_to_sales()
+
         qs = super().get_queryset()
         status_param = self.request.query_params.get('status')
         payment_status = self.request.query_params.get('payment_status')
+        order_type = self.request.query_params.get('order_type')
         search = self.request.query_params.get('search')
         customer_id = self.request.query_params.get('customer')
 
@@ -535,6 +521,8 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_param)
         if payment_status and payment_status != 'ALL':
             qs = qs.filter(payment_status=payment_status)
+        if order_type and order_type != 'ALL':
+            qs = qs.filter(order_type=order_type)
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
         if search:
@@ -549,14 +537,15 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         data = request.data
+        order_type = data.get('order_type', 'REGULAR')
         order_timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
-        inquiry_number = f"CRV-ORD-{order_timestamp}"
+        prefix = "CRV-WSL" if order_type == 'WHOLESALE' else "CRV-ORD"
+        inquiry_number = f"{prefix}-{order_timestamp}"
         customer_name = data.get('customer_name', '').strip() or 'Customer'
         customer_phone = data.get('customer_phone', '').strip()
         customer_email = data.get('customer_email', '').strip()
         delivery_address = data.get('delivery_address', '').strip()
         delivery_method = data.get('delivery_method', 'PICKUP')
-        order_type = data.get('order_type', 'REGULAR')
         special_instructions = data.get('special_instructions', '')
         target_date = data.get('target_date') or None
         items_summary = data.get('items_summary', '')
@@ -672,17 +661,16 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         )
 
         inquiry.amount_paid = (inquiry.amount_paid or Decimal('0.00')) + amount
+        inquiry.payment_type = payment_method
         inquiry.save()
 
         # If order is completed or fully paid, automatically create/link official SaleOrder!
-        if (inquiry.status == InquiryStatus.COMPLETED or inquiry.remaining_balance <= 0) and not inquiry.converted_sale_id:
-            inquiry.auto_create_sale_order()
-
-        # Update linked sale notes if present
-        if inquiry.converted_sale:
-            sale = inquiry.converted_sale
-            sale.notes = f"{sale.notes}\n[Payment: ₱{amount:.2f} via {payment_method} on {payment_date}]".strip()
-            sale.save()
+        if inquiry.status == InquiryStatus.COMPLETED or inquiry.remaining_balance <= 0:
+            sale = inquiry.auto_create_sale_order()
+            if sale:
+                sale.payment_method = payment_method
+                sale.notes = f"{sale.notes}\n[Payment: ₱{amount:.2f} via {payment_method} on {payment_date}]".strip()
+                sale.save()
 
         return Response({
             'order': self.get_serializer(inquiry).data,
@@ -699,16 +687,13 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         created_runs = []
 
         target_date = inquiry.target_date or timezone.now().date()
-        notes = f"Auto-scheduled from Customer Order {inquiry.inquiry_number} for {inquiry.customer_name}."
+        notes = f"Auto-scheduled from Order {inquiry.inquiry_number} for {inquiry.customer_name}."
 
         for item in items:
             name = item.get('name', '')
             qty = int(item.get('qty', 1))
 
-            # Match variant by name
-            variant = ProductVariant.objects.filter(name__icontains=name.split('—')[0].strip()).first()
-            if not variant:
-                variant = ProductVariant.objects.first()
+            variant = match_product_variant(name, item.get('price'))
 
             if not variant or not hasattr(variant, 'recipe'):
                 continue
@@ -771,17 +756,11 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     def convert_to_sale(self, request, pk=None):
         """Order-to-Sales Integration (Section 3B): Prevents duplicate sales and links customer"""
         inquiry = self.get_object()
-        if inquiry.converted_sale:
-            return Response({
-                'detail': f'This order is already linked to Sale Order {inquiry.converted_sale.receipt_number}.',
-                'sale_order_id': inquiry.converted_sale.id,
-                'receipt_number': inquiry.converted_sale.receipt_number,
-                'inquiry': self.get_serializer(inquiry).data
-            })
-
         payment_method = request.data.get('payment_method', PaymentMethod.GCASH)
         inquiry.payment_type = payment_method
         inquiry.status = InquiryStatus.COMPLETED
+        if (inquiry.amount_paid or Decimal('0.00')) < (inquiry.estimated_total or Decimal('0.00')):
+            inquiry.amount_paid = inquiry.estimated_total
         inquiry.save()
         sale_order = inquiry.auto_create_sale_order()
 
@@ -794,6 +773,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='receivables-summary')
     def receivables_summary(self, request):
         """Receivables and Payment Monitoring (Section 6C & Section 8)"""
+        sync_all_inquiries_to_sales()
         today = timezone.now().date()
         week_ahead = today + timezone.timedelta(days=7)
 

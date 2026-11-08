@@ -75,10 +75,10 @@ export const SalesPage: React.FC = () => {
     try {
       setLoading(true);
       const [salesData, vars, summ, inqs] = await Promise.all([
-        api.getSales(),
-        api.getVariants(),
-        api.getSalesSummary(),
-        api.getInquiries(),
+        api.getSales().catch(() => []),
+        api.getVariants().catch(() => []),
+        api.getSalesSummary().catch(() => null),
+        api.getInquiries().catch(() => []),
       ]);
       setSales(salesData);
       setVariants(vars);

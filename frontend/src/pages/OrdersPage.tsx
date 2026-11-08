@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingBag,
   Search,
@@ -41,6 +42,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { api } from '../services/api';
+import { calculateWholesaleDiscount, getWholesaleDescription } from '../utils/pricing';
 import {
   CustomerInquiry,
   ProductVariant,
@@ -54,7 +56,11 @@ import {
 } from '../types';
 
 export const OrdersPage: React.FC = () => {
-  const [pageTab, setPageTab] = useState<'ORDERS' | 'FEATURED_GALLERY' | 'CUSTOMERS' | 'RECEIVABLES' | 'REVIEWS'>('ORDERS');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [pageTab, setPageTab] = useState<'ORDERS' | 'WHOLESALE' | 'FEATURED_GALLERY' | 'CUSTOMERS' | 'RECEIVABLES' | 'REVIEWS'>(
+    location.pathname.startsWith('/wholesale-orders') ? 'WHOLESALE' : 'ORDERS'
+  );
   const [inquiries, setInquiries] = useState<CustomerInquiry[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
@@ -152,17 +158,27 @@ export const OrdersPage: React.FC = () => {
   const [reviewStatusFilter, setReviewStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
   const [reviewSearchQuery, setReviewSearchQuery] = useState('');
 
-  // Standard menu catalog for quick add
+  // Standard menu catalog for quick add (Retail & Wholesale)
   const QUICK_MENU = [
-    { name: 'Banana Cake — Small', price: 60 },
     { name: 'Banana Cake — Big', price: 135 },
+    { name: 'Banana Cake — Small', price: 60 },
     { name: 'Classic Brownies — Small Box (3 pcs)', price: 110 },
     { name: 'Classic Brownies — Big Box (6 pcs)', price: 220 },
-    { name: 'Red Velvet Cookies — Box of 6', price: 210 },
-    { name: 'Red Velvet Cookies — Assorted', price: 190 },
+    { name: 'Classic Choco Chip Cookie — Per Pc', price: 30 },
+    { name: 'Red Velvet Cookie — Per Pc', price: 35 },
     { name: 'Choco Chip Cookies — Box of 6', price: 180 },
-    { name: 'Choco Chip Cookies — Assorted', price: 190 },
+    { name: 'Red Velvet Cookies — Box of 6', price: 210 },
+    { name: 'Choco Chip Cookies — Assorted Box', price: 190 },
+    { name: 'Red Velvet Cookies — Assorted Box', price: 190 },
   ];
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/wholesale-orders')) {
+      setPageTab('WHOLESALE');
+    } else if (location.pathname.startsWith('/orders') && pageTab === 'WHOLESALE') {
+      setPageTab('ORDERS');
+    }
+  }, [location.pathname]);
 
   const fetchData = async () => {
     try {
@@ -340,24 +356,58 @@ export const OrdersPage: React.FC = () => {
     }
   };
 
-  // Create Manual Order
+  // Create Manual Order (supports both Regular Pre-Orders and Reseller Whole Sales Orders)
   const handleCreateManualOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) {
-      alert('Please enter a customer name.');
+      alert('Please enter a customer or reseller name.');
       return;
     }
 
-    const itemsArray = Object.values(newOrderItems);
+    const itemsArray = Object.values(newOrderItems).filter((i) => i.qty > 0);
     if (itemsArray.length === 0) {
       alert('Please add at least one item to this order.');
       return;
     }
 
-    const totalEst = itemsArray.reduce((acc, item) => acc + item.price * item.qty, 0);
-    const summaryText = itemsArray
-      .map((item) => `${item.qty}x ${item.name} (₱${item.price.toFixed(2)})`)
-      .join('\n');
+    const isWholesale = newOrderType === 'WHOLESALE';
+    const processedItems = itemsArray.map((item) => {
+      if (isWholesale) {
+        const ws = calculateWholesaleDiscount(item.name, item.price, item.qty);
+        return {
+          name: item.name,
+          qty: item.qty,
+          regular_price: item.price,
+          price: ws.discountedUnitPrice,
+          discount: ws.totalDiscount,
+          tier: ws.tierBadge,
+          finalTotal: ws.finalTotal,
+        };
+      }
+      return {
+        name: item.name,
+        qty: item.qty,
+        regular_price: item.price,
+        price: item.price,
+        discount: 0,
+        tier: '',
+        finalTotal: item.price * item.qty,
+      };
+    });
+
+    const totalEst = processedItems.reduce((acc, item) => acc + item.finalTotal, 0);
+    const totalSaved = processedItems.reduce((acc, item) => acc + item.discount, 0);
+
+    const summaryLines = processedItems.map((item) => {
+      if (isWholesale && item.discount > 0) {
+        return `• ${item.qty}x ${item.name} — ₱${item.price.toFixed(2)}/ea [Reg ₱${item.regular_price}, ${item.tier}, Saved ₱${item.discount.toFixed(2)}] = ₱${item.finalTotal.toFixed(2)}`;
+      }
+      return `• ${item.qty}x ${item.name} (₱${item.price.toFixed(2)}) = ₱${item.finalTotal.toFixed(2)}`;
+    });
+
+    const summaryText = isWholesale
+      ? `CRAVEABLES WHOLE SALES ORDER (RESELLER)\n${summaryLines.join('\n')}\nTotal Wholesale Discount Saved: -₱${totalSaved.toFixed(2)}\nNet Reseller Total: ₱${totalEst.toFixed(2)}`
+      : summaryLines.join('\n');
 
     try {
       setCreatingOrder(true);
@@ -371,7 +421,7 @@ export const OrdersPage: React.FC = () => {
         payment_due_date: newPaymentDueDate || null,
         initial_deposit: parseFloat(newInitialDeposit) || 0,
         items_summary: summaryText,
-        items_json: itemsArray,
+        items_json: processedItems,
         estimated_total: totalEst,
         notes: newNotes,
         status: newStatus,
@@ -388,18 +438,33 @@ export const OrdersPage: React.FC = () => {
       setNewOrderItems({});
       await fetchData();
     } catch (err: any) {
-      alert(err.message || 'Failed to create pre-order');
+      alert(err.message || 'Failed to create order');
     } finally {
       setCreatingOrder(false);
     }
   };
 
-  const handleQuickAddItem = (item: { name: string; price: number }) => {
+  const handleQuickAddItem = (item: { name: string; price: number }, step = 1) => {
     setNewOrderItems((prev) => {
       const cur = prev[item.name] || { name: item.name, price: item.price, qty: 0 };
       return {
         ...prev,
-        [item.name]: { ...cur, qty: cur.qty + 1 },
+        [item.name]: { ...cur, qty: cur.qty + step },
+      };
+    });
+  };
+
+  const handleQuickSetQty = (item: { name: string; price: number }, rawQty: number) => {
+    const qty = Math.max(0, Math.floor(rawQty || 0));
+    setNewOrderItems((prev) => {
+      if (qty <= 0) {
+        const next = { ...prev };
+        delete next[item.name];
+        return next;
+      }
+      return {
+        ...prev,
+        [item.name]: { name: item.name, price: item.price, qty },
       };
     });
   };
@@ -594,22 +659,27 @@ export const OrdersPage: React.FC = () => {
     }
   };
 
-  // Order counts & metrics
-  const totalInquiries = inquiries.length;
-  const newCount = inquiries.filter((i) => i.status === 'NEW').length;
-  const pendingCount = inquiries.filter((i) => i.status === 'PENDING').length;
-  const confirmedCount = inquiries.filter((i) => i.status === 'CONFIRMED').length;
-  const inProdCount = inquiries.filter((i) => i.status === 'SCHEDULED_PRODUCTION' || i.status === 'BAKING').length;
-  const readyCount = inquiries.filter((i) => i.status === 'READY').length;
-  const completedCount = inquiries.filter((i) => i.status === 'COMPLETED').length;
-  const cancelledCount = inquiries.filter((i) => i.status === 'CANCELLED').length;
+  // Separate Regular Customer Orders vs Reseller Whole Sales Orders
+  const regularOrders = inquiries.filter((i) => i.order_type !== 'WHOLESALE');
+  const wholesaleOrders = inquiries.filter((i) => i.order_type === 'WHOLESALE');
+  const activePool = pageTab === 'WHOLESALE' ? wholesaleOrders : regularOrders;
 
-  const totalActiveValue = inquiries
+  // Order counts & metrics for active pool
+  const totalInquiries = activePool.length;
+  const newCount = activePool.filter((i) => i.status === 'NEW').length;
+  const pendingCount = activePool.filter((i) => i.status === 'PENDING').length;
+  const confirmedCount = activePool.filter((i) => i.status === 'CONFIRMED').length;
+  const inProdCount = activePool.filter((i) => i.status === 'SCHEDULED_PRODUCTION' || i.status === 'BAKING').length;
+  const readyCount = activePool.filter((i) => i.status === 'READY').length;
+  const completedCount = activePool.filter((i) => i.status === 'COMPLETED').length;
+  const cancelledCount = activePool.filter((i) => i.status === 'CANCELLED').length;
+
+  const totalActiveValue = activePool
     .filter((i) => i.status !== 'CANCELLED' && i.status !== 'COMPLETED')
     .reduce((sum, i) => sum + Number(i.estimated_total || 0), 0);
 
   // Orders Filter & Search
-  const filteredInquiries = inquiries
+  const filteredInquiries = activePool
     .filter((inq) => {
       if (statusFilter !== 'ALL' && inq.status !== statusFilter) return false;
       if (searchQuery.trim()) {
@@ -734,11 +804,15 @@ export const OrdersPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display font-bold text-2xl sm:text-3xl text-bakery-chocolate">
-              Customer Orders &amp; Storefront Hub
+              {pageTab === 'WHOLESALE'
+                ? 'Whole Sales Order — Reseller & Bulk Hub'
+                : 'Customer Orders & Storefront Hub'}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-bakery-muted mt-1">
-            Manage incoming pre-orders, kitchen production runs, customer database, accounts receivable, and gallery photos.
+            {pageTab === 'WHOLESALE'
+              ? 'Dedicated reseller order list with automatic volume & product wholesale discounts connected to Sales & Production.'
+              : 'Manage incoming pre-orders, kitchen production runs, customer database, accounts receivable, and gallery photos.'}
           </p>
         </div>
 
@@ -746,7 +820,10 @@ export const OrdersPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center bg-bakery-cream p-1 rounded-2xl border border-bakery-beige shadow-2xs overflow-x-auto max-w-full">
             <button
-              onClick={() => setPageTab('ORDERS')}
+              onClick={() => {
+                setPageTab('ORDERS');
+                if (location.pathname.startsWith('/wholesale-orders')) navigate('/orders');
+              }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                 pageTab === 'ORDERS'
                   ? 'bg-bakery-chocolate text-white shadow-warm-xs'
@@ -754,12 +831,28 @@ export const OrdersPage: React.FC = () => {
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Orders</span>
-              {(newCount + pendingCount) > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-status-orange text-white">
-                  {newCount + pendingCount}
-                </span>
-              )}
+              <span>Customer Orders</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-bakery-caramel text-white">
+                {regularOrders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPageTab('WHOLESALE');
+                if (!location.pathname.startsWith('/wholesale-orders')) navigate('/wholesale-orders');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                pageTab === 'WHOLESALE'
+                  ? 'bg-bakery-chocolate text-white shadow-warm-xs'
+                  : 'text-bakery-chocolate hover:text-bakery-caramel'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Whole Sales Order</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
+                {wholesaleOrders.length}
+              </span>
             </button>
 
             <button
@@ -839,9 +932,66 @@ export const OrdersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TAB 1: ORDERS */}
-      {pageTab === 'ORDERS' && (
+      {/* TAB 1 & WHOLESALE: ORDERS / WHOLE SALES ORDER */}
+      {(pageTab === 'ORDERS' || pageTab === 'WHOLESALE') && (
         <div className="space-y-6">
+          {/* Official Reseller Wholesale Discount Tier Banner (Shown in Whole Sales Order) */}
+          {pageTab === 'WHOLESALE' && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-[#3B170B] to-[#512212] text-white border border-bakery-caramel/40 shadow-warm-md">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-bakery-caramel text-white mb-1.5">
+                    <Sparkles className="w-3 h-3" /> Official Reseller &amp; Wholesale Discount Matrix
+                  </span>
+                  <h2 className="font-display font-bold text-lg sm:text-xl text-bakery-cream">
+                    Whole Sales Order Pricing &amp; Automatic Reseller Discounts
+                  </h2>
+                  <p className="text-xs text-bakery-beige/80">
+                    Discounts are automatically calculated based on product and quantity when you record a Whole Sales Order.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setNewOrderType('WHOLESALE');
+                    setIsCreateModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-bakery-caramel hover:bg-[#936535] text-white text-xs font-bold shadow-md flex items-center gap-2 shrink-0 transition-transform active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ New Whole Sales Order</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
+                <div className="p-3 rounded-xl bg-white/10 border border-white/15 backdrop-blur-xs">
+                  <p className="font-bold text-bakery-cream mb-1">🍌 Banana Cake Big (₱135)</p>
+                  <p className="text-[11px] text-bakery-beige">• 10 below: <strong className="text-emerald-300">-₱10 / pc</strong> (₱125)</p>
+                  <p className="text-[11px] text-bakery-beige">• 10 above: <strong className="text-emerald-300">-₱15 / pc</strong> (₱120)</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/10 border border-white/15 backdrop-blur-xs">
+                  <p className="font-bold text-bakery-cream mb-1">🍌 Banana Cake Small (₱60)</p>
+                  <p className="text-[11px] text-bakery-beige">• 10 below: <strong className="text-emerald-300">5% OFF</strong> (₱57)</p>
+                  <p className="text-[11px] text-bakery-beige">• 10 above: <strong className="text-emerald-300">10% OFF</strong> (₱54)</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/10 border border-white/15 backdrop-blur-xs">
+                  <p className="font-bold text-bakery-cream mb-1">🍫 Classic Brownies</p>
+                  <p className="text-[11px] text-bakery-beige">• Small (₱110): <strong className="text-emerald-300">-₱10 / box</strong> (₱100)</p>
+                  <p className="text-[11px] text-bakery-beige">• Big (₱220): <strong className="text-emerald-300">-₱20 / box</strong> (₱200)</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/10 border border-white/15 backdrop-blur-xs">
+                  <p className="font-bold text-bakery-cream mb-1">🍪 Cookies (Per Pcs)</p>
+                  <p className="text-[11px] text-bakery-beige">• Classic (₱30): <strong className="text-emerald-300">-₱5 each</strong> (₱25)</p>
+                  <p className="text-[11px] text-bakery-beige">• Red Velvet (₱35): <strong className="text-emerald-300">-₱5 each</strong> (₱30)</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/10 border border-white/15 backdrop-blur-xs">
+                  <p className="font-bold text-bakery-cream mb-1">🍪 Cookies Box (Box of 6)</p>
+                  <p className="text-[11px] text-bakery-beige">• 10 below: <strong className="text-emerald-300">-₱10 / box</strong></p>
+                  <p className="text-[11px] text-bakery-beige">• 10 above: <strong className="text-emerald-300">-₱15 / box</strong></p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Top Metrics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
             <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-xs">
@@ -960,15 +1110,70 @@ export const OrdersPage: React.FC = () => {
                 </button>
               </div>
 
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95 flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4 text-bakery-caramel" />
-                <span>Record Pre-Order</span>
-              </button>
+              {pageTab === 'WHOLESALE' ? (
+                <button
+                  onClick={() => {
+                    setNewOrderType('WHOLESALE');
+                    setIsCreateModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95 flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4 text-bakery-caramel" />
+                  <span>Record Whole Sales Order</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setNewOrderType('REGULAR');
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4 text-bakery-caramel" />
+                    <span>Record Pre-Order</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewOrderType('WHOLESALE');
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-bakery-caramel text-white text-xs font-bold hover:bg-[#936535] shadow-warm-sm transition-transform active:scale-95 flex items-center gap-1.5"
+                    title="Record a Reseller Whole Sales Order with automatic volume discounts"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">+ Whole Sales Order</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
+
+          {filteredInquiries.length === 0 && (
+            <div className="p-10 rounded-3xl bg-bakery-ivory border border-bakery-beige text-center space-y-3 shadow-warm-xs">
+              <div className="w-12 h-12 rounded-2xl bg-bakery-cream border border-bakery-beige flex items-center justify-center mx-auto text-bakery-caramel">
+                {pageTab === 'WHOLESALE' ? <Layers className="w-6 h-6" /> : <ShoppingBag className="w-6 h-6" />}
+              </div>
+              <h3 className="font-display font-bold text-lg text-bakery-chocolate">
+                {pageTab === 'WHOLESALE' ? 'No Whole Sales Orders Recorded Yet' : 'No Customer Orders Found'}
+              </h3>
+              <p className="text-xs text-bakery-muted max-w-md mx-auto">
+                {pageTab === 'WHOLESALE'
+                  ? 'Record your reseller and bulk partner orders here to automatically apply tiered wholesale discounts and sync with Production and Sales.'
+                  : 'Record a customer pre-order or adjust your status/search filters above.'}
+              </p>
+              <button
+                onClick={() => {
+                  setNewOrderType(pageTab === 'WHOLESALE' ? 'WHOLESALE' : 'REGULAR');
+                  setIsCreateModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] shadow-warm-sm"
+              >
+                <Plus className="w-4 h-4 text-bakery-caramel" />
+                <span>{pageTab === 'WHOLESALE' ? 'Record First Whole Sales Order' : 'Record Customer Pre-Order'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Orders Cards View */}
           {viewMode === 'cards' ? (
@@ -1208,6 +1413,25 @@ export const OrdersPage: React.FC = () => {
                                   Pay
                                 </button>
                               )}
+                              {!inq.converted_sale && inq.status !== 'CANCELLED' && (
+                                <button
+                                  onClick={() => setConvertingInquiry(inq)}
+                                  className="px-2 py-1 rounded bg-bakery-chocolate text-white font-bold text-[10px] hover:bg-[#2c1108]"
+                                  title="Convert to Official Sale"
+                                >
+                                  Record Sale
+                                </button>
+                              )}
+                              <a
+                                href={api.getInquiryReceiptPdfUrl(inq.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className="p-1 rounded bg-bakery-cream border border-bakery-beige hover:bg-bakery-beige text-bakery-chocolate"
+                                title="Download Official PDF Receipt"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </a>
                               <button
                                 onClick={() => handleSendToProduction(inq)}
                                 className="p-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100"
@@ -2348,14 +2572,29 @@ export const OrdersPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Create Manual Pre-Order */}
+      {/* MODAL: Create Manual Pre-Order / Whole Sales Order */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-bakery-ivory w-full max-w-lg rounded-3xl border border-bakery-beige shadow-warm-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-bakery-ivory w-full max-w-2xl rounded-3xl border border-bakery-beige shadow-warm-lg max-h-[92vh] flex flex-col overflow-hidden">
             <div className="p-5 bg-bakery-chocolate text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-bakery-caramel" />
-                <h3 className="font-display font-bold text-base">Record Customer Pre-Order</h3>
+                {newOrderType === 'WHOLESALE' ? (
+                  <Layers className="w-5 h-5 text-bakery-caramel" />
+                ) : (
+                  <Plus className="w-5 h-5 text-bakery-caramel" />
+                )}
+                <div>
+                  <h3 className="font-display font-bold text-base">
+                    {newOrderType === 'WHOLESALE'
+                      ? 'Record Whole Sales Order (Reseller Discount Calculator)'
+                      : 'Record Customer Pre-Order'}
+                  </h3>
+                  {newOrderType === 'WHOLESALE' && (
+                    <p className="text-[11px] text-bakery-beige/80">
+                      Automatic reseller discounts applied for Banana Cake, Brownies, Cookies Per Pc &amp; Cookies Box
+                    </p>
+                  )}
+                </div>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-bakery-cream/70 hover:text-white font-bold">
                 ✕
@@ -2365,11 +2604,13 @@ export const OrdersPage: React.FC = () => {
             <form onSubmit={handleCreateManualOrder} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">Customer Name *</label>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">
+                    {newOrderType === 'WHOLESALE' ? 'Reseller / Partner Name *' : 'Customer Name *'}
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="Full name"
+                    placeholder={newOrderType === 'WHOLESALE' ? 'Reseller or store name' : 'Full name'}
                     value={newCustName}
                     onChange={(e) => setNewCustName(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
@@ -2390,13 +2631,14 @@ export const OrdersPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">Order Type</label>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Order Category / Type</label>
                   <select
                     value={newOrderType}
                     onChange={(e) => setNewOrderType(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs font-semibold text-bakery-chocolate focus:outline-hidden"
                   >
-                    <option value="REGULAR">Regular Order</option>
+                    <option value="WHOLESALE">Whole Sales Order (Reseller Discounted)</option>
+                    <option value="REGULAR">Regular Customer Order (Retail)</option>
                     <option value="CUSTOM">Customized Bake</option>
                     <option value="BULK">Bulk Package</option>
                     <option value="SPECIAL_EVENT">Birthday / Event</option>
@@ -2449,47 +2691,141 @@ export const OrdersPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Menu Selection */}
+              {/* Quick Menu Selection with Wholesale Calculator */}
               <div>
-                <label className="block font-semibold text-bakery-chocolate mb-1.5">Select Bakes / Items *</label>
-                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-white rounded-2xl border border-bakery-beige">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-bakery-chocolate">
+                    Select Products &amp; Quantities *
+                  </label>
+                  {newOrderType === 'WHOLESALE' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      ✨ Wholesale Reseller Discounts Active
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto p-2.5 bg-white rounded-2xl border border-bakery-beige">
                   {QUICK_MENU.map((item) => {
                     const qty = newOrderItems[item.name]?.qty || 0;
+                    const ws = newOrderType === 'WHOLESALE' && qty > 0
+                      ? calculateWholesaleDiscount(item.name, item.price, qty)
+                      : null;
+                    const ruleHint = newOrderType === 'WHOLESALE'
+                      ? getWholesaleDescription(item.name, item.price)
+                      : '';
+
                     return (
                       <div
                         key={item.name}
-                        className="p-2 rounded-xl bg-bakery-cream/50 border border-bakery-beige/80 flex items-center justify-between"
+                        className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between gap-2 ${
+                          qty > 0
+                            ? 'bg-bakery-cream border-bakery-caramel shadow-2xs'
+                            : 'bg-bakery-cream/40 border-bakery-beige/80'
+                        }`}
                       >
-                        <div className="min-w-0 pr-1">
-                          <p className="font-semibold truncate text-[11px] text-bakery-chocolate">{item.name}</p>
-                          <span className="font-display font-bold text-bakery-caramel">₱{item.price}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-[11px] text-bakery-chocolate leading-tight">{item.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {ws && ws.unitDiscount > 0 ? (
+                                <>
+                                  <span className="text-[10px] line-through text-bakery-muted">₱{item.price}</span>
+                                  <span className="font-display font-bold text-xs text-emerald-700">
+                                    ₱{ws.discountedUnitPrice.toFixed(2)}/ea
+                                  </span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-600 text-white">
+                                    {ws.tierBadge}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="font-display font-bold text-xs text-bakery-caramel">₱{item.price}</span>
+                              )}
+                            </div>
+                            {newOrderType === 'WHOLESALE' && (
+                              <p className="text-[9px] text-bakery-muted mt-0.5">{ruleHint}</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {qty > 0 && (
-                            <>
+
+                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-bakery-beige/50">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleQuickRemoveItem(item.name)}
+                              className="w-6 h-6 rounded-lg bg-white text-bakery-chocolate font-bold flex items-center justify-center border border-bakery-beige hover:bg-bakery-beige/40"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty === 0 ? '' : qty}
+                              placeholder="0"
+                              onChange={(e) => handleQuickSetQty(item, parseInt(e.target.value, 10) || 0)}
+                              className="w-12 h-6 text-center rounded-lg bg-white border border-bakery-beige font-bold text-xs text-bakery-chocolate focus:outline-hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAddItem(item, 1)}
+                              className="w-6 h-6 rounded-lg bg-bakery-chocolate text-white font-bold flex items-center justify-center hover:bg-[#2c1108]"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {newOrderType === 'WHOLESALE' && (
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                onClick={() => handleQuickRemoveItem(item.name)}
-                                className="w-5 h-5 rounded bg-white text-bakery-chocolate font-bold flex items-center justify-center border border-bakery-beige"
+                                onClick={() => handleQuickAddItem(item, 5)}
+                                className="px-1.5 py-0.5 rounded bg-bakery-beige/60 hover:bg-bakery-caramel hover:text-white text-[10px] font-bold text-bakery-chocolate transition-colors"
                               >
-                                -
+                                +5
                               </button>
-                              <span className="font-bold px-1">{qty}</span>
-                            </>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAddItem(item, 10)}
+                                className="px-1.5 py-0.5 rounded bg-bakery-caramel/20 hover:bg-bakery-caramel hover:text-white text-[10px] font-bold text-bakery-chocolate transition-colors"
+                              >
+                                +10
+                              </button>
+                            </div>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAddItem(item)}
-                            className="w-5 h-5 rounded bg-bakery-chocolate text-white font-bold flex items-center justify-center"
-                          >
-                            +
-                          </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Live Order & Wholesale Discount Summary Box */}
+              {Object.values(newOrderItems).some((i) => i.qty > 0) && (() => {
+                const selected = Object.values(newOrderItems).filter((i) => i.qty > 0);
+                const regTotal = selected.reduce((sum, i) => sum + i.price * i.qty, 0);
+                const wsDiscount = newOrderType === 'WHOLESALE'
+                  ? selected.reduce((sum, i) => sum + calculateWholesaleDiscount(i.name, i.price, i.qty).totalDiscount, 0)
+                  : 0;
+                const netPayable = Math.max(0, regTotal - wsDiscount);
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-bakery-cream border border-bakery-caramel/40 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-bakery-muted">
+                      <span>Regular Retail Subtotal:</span>
+                      <span className="font-semibold">₱{regTotal.toFixed(2)}</span>
+                    </div>
+                    {newOrderType === 'WHOLESALE' && (
+                      <div className="flex items-center justify-between text-xs text-emerald-700 font-bold">
+                        <span>Wholesale Reseller Discount Saved:</span>
+                        <span>-₱{wsDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1.5 border-t border-bakery-beige text-sm font-display font-bold text-bakery-chocolate">
+                      <span>{newOrderType === 'WHOLESALE' ? 'Net Wholesale Total:' : 'Order Total:'}</span>
+                      <span className="text-base">₱{netPayable.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Deposit / Advance Payment */}
               <div>

@@ -14,7 +14,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-from apps.sales.models import SaleOrder, SaleItem, CustomerInquiry, Customer, CustomerPayment
+from apps.sales.models import SaleOrder, SaleItem, CustomerInquiry, Customer, CustomerPayment, sync_all_inquiries_to_sales
 from apps.expenses.models import Expense
 from apps.inventory.models import Ingredient, StockTransaction
 from apps.production.models import ProductionOrder, ProductionIngredientUsage
@@ -23,15 +23,16 @@ from apps.products.models import ProductVariant
 
 @api_view(['GET'])
 def dashboard_stats(request):
+    sync_all_inquiries_to_sales()
     today = timezone.now().date()
     # Overall figures
     sales_agg = SaleOrder.objects.aggregate(
-        total_sales=Sum('total_sales'),
-        gross_profit=Sum('gross_profit'),
-        total_cogs=Sum('total_cogs')
+        sum_sales=Sum('total_sales'),
+        sum_gp=Sum('gross_profit'),
+        sum_cogs=Sum('total_cogs')
     )
-    total_sales = sales_agg['total_sales'] or Decimal('0.00')
-    gross_profit = sales_agg['gross_profit'] or Decimal('0.00')
+    total_sales = sales_agg['sum_sales'] or Decimal('0.00')
+    gross_profit = sales_agg['sum_gp'] or Decimal('0.00')
 
     exp_agg = Expense.objects.aggregate(total_expenses=Sum('amount'))
     operating_expenses = exp_agg['total_expenses'] or Decimal('0.00')
@@ -129,6 +130,7 @@ def dashboard_stats(request):
 
 @api_view(['GET'])
 def profit_loss_report(request):
+    sync_all_inquiries_to_sales()
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
 
@@ -143,18 +145,18 @@ def profit_loss_report(request):
         exp_qs = exp_qs.filter(date__lte=end_date)
 
     sales_agg = sales_qs.aggregate(
-        subtotal=Sum('subtotal'),
-        discount=Sum('discount'),
-        total_sales=Sum('total_sales'),
-        cogs=Sum('total_cogs'),
-        gross_profit=Sum('gross_profit')
+        sum_subtotal=Sum('subtotal'),
+        sum_discount=Sum('discount'),
+        sum_total_sales=Sum('total_sales'),
+        sum_cogs=Sum('total_cogs'),
+        sum_gross_profit=Sum('gross_profit')
     )
 
-    gross_sales = sales_agg['subtotal'] or Decimal('0.00')
-    discounts = sales_agg['discount'] or Decimal('0.00')
-    net_sales = sales_agg['total_sales'] or Decimal('0.00')
-    cogs = sales_agg['cogs'] or Decimal('0.00')
-    gross_profit = sales_agg['gross_profit'] or Decimal('0.00')
+    gross_sales = sales_agg['sum_subtotal'] or Decimal('0.00')
+    discounts = sales_agg['sum_discount'] or Decimal('0.00')
+    net_sales = sales_agg['sum_total_sales'] or Decimal('0.00')
+    cogs = sales_agg['sum_cogs'] or Decimal('0.00')
+    gross_profit = sales_agg['sum_gross_profit'] or Decimal('0.00')
 
     exp_by_category = exp_qs.values('category').annotate(total=Sum('amount')).order_by('-total')
     total_operating_expenses = sum(item['total'] for item in exp_by_category) or Decimal('0.00')
