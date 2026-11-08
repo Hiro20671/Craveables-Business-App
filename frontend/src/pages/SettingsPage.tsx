@@ -5,6 +5,7 @@ import {
   Users,
   Shield,
   Download,
+  Upload,
   Database,
   Building,
   Smartphone,
@@ -58,6 +59,11 @@ export const SettingsPage: React.FC = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  // Database Sync
+  const [importingDb, setImportingDb] = useState(false);
+  const [dbSyncMsg, setDbSyncMsg] = useState<string | null>(null);
+  const dbFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
     try {
@@ -138,6 +144,27 @@ export const SettingsPage: React.FC = () => {
       setPasswordError(err.message || 'Failed to update password.');
     } finally {
       setUpdatingPassword(false);
+    }
+  };
+
+  const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportingDb(true);
+      setDbSyncMsg(null);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.importDatabase(formData);
+      setDbSyncMsg(res.detail || 'Successfully synchronized real database records!');
+      alert('Database backup loaded successfully! All orders, sales, and records are now updated.');
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to import database');
+    } finally {
+      setImportingDb(false);
+      if (dbFileInputRef.current) dbFileInputRef.current.value = '';
     }
   };
 
@@ -438,15 +465,55 @@ export const SettingsPage: React.FC = () => {
               <span>Data Export & Backup</span>
             </div>
             <p className="text-bakery-muted">
-              Download complete database records including ingredients, recipes, sales, and operating expenses.
+              Synchronize real live records between PythonAnywhere and Localhost, or download Excel reports.
             </p>
-            <button
-              onClick={() => window.open(api.downloadExcelReportUrl(), '_blank')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108] transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download Excel Backup (.xlsx)</span>
-            </button>
+
+            {dbSyncMsg && (
+              <div className="p-2.5 rounded-xl bg-status-greenLight border border-status-green/30 text-status-green text-[11px] font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{dbSyncMsg}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <a
+                href={api.getExportDbUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                download="craveables_live_data.json"
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108] transition-colors"
+              >
+                <Download className="w-4 h-4 text-bakery-cream" />
+                <span>Export Real Database Backup (.json)</span>
+              </a>
+
+              <input
+                type="file"
+                ref={dbFileInputRef}
+                accept=".json"
+                onChange={handleImportDatabase}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                disabled={importingDb}
+                onClick={() => dbFileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-white border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-cream transition-colors disabled:opacity-50"
+              >
+                <Upload className="w-4 h-4 text-bakery-caramel" />
+                <span>{importingDb ? 'Importing Live Data...' : 'Import Real Database Backup (.json)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.open(api.downloadExcelReportUrl(), '_blank')}
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-white border border-bakery-beige text-bakery-muted text-xs font-medium hover:bg-bakery-cream transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download Excel Backup (.xlsx)</span>
+              </button>
+            </div>
 
             <div className="pt-3 border-t border-bakery-beige/80 flex items-center gap-3">
               <Smartphone className="w-5 h-5 text-bakery-caramel flex-shrink-0" />

@@ -113,3 +113,4 @@ export function getWholesaleDescription(itemName: string): string {
   }
   return 'Special wholesale discount available on volume orders';
 }
+

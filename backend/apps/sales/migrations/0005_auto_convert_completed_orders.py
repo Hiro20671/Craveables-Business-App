@@ -73,3 +73,4 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(auto_convert_completed_inquiries, reverse_func),
     ]
+

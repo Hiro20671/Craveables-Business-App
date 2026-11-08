@@ -235,5 +235,7 @@ export const api = {
   // Settings
   getSettings: () => request<any>('/settings/general/'),
   updateSettings: (data: any) => request<any>('/settings/general/', { method: 'POST', body: JSON.stringify(data) }),
+  getExportDbUrl: () => `${API_BASE}/settings/export-db/`,
+  importDatabase: (formData: FormData) => request<any>('/settings/import-db/', { method: 'POST', body: formData }),
 };
 

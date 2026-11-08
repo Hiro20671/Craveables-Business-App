@@ -43,6 +43,14 @@ def serve_spa(request, resource=""):
                 response = FileResponse(open(file_path, 'rb'), content_type=content_type or 'application/octet-stream')
                 if encoding:
                     response['Content-Encoding'] = encoding
+                
+                # Never cache service worker or manifest
+                if clean_resource in ['sw.js', 'service-worker.js', 'manifest.json']:
+                    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+                    response['Pragma'] = 'no-cache'
+                    response['Expires'] = '0'
+                elif 'assets/' in clean_resource:
+                    response['Cache-Control'] = 'public, max-age=31536000, immutable'
                 return response
         except Exception:
             pass
@@ -50,7 +58,11 @@ def serve_spa(request, resource=""):
     # Fallback to index.html for client-side routing (e.g. /, /login, /dashboard)
     index_file = frontend_dist / 'index.html'
     if index_file.exists():
-        return FileResponse(open(index_file, 'rb'), content_type='text/html')
+        response = FileResponse(open(index_file, 'rb'), content_type='text/html')
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
         
     return HttpResponse("""
         <!DOCTYPE html>

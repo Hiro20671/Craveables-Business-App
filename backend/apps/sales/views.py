@@ -6,8 +6,9 @@ from django.db import transaction
 from django.db.models import Sum, Count, Avg, Q
 from django.http import HttpResponse
 from django.utils import timezone
+
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -30,9 +31,7 @@ from apps.products.models import ProductVariant
 from apps.costing.models import Recipe
 from apps.production.models import ProductionOrder, ProductionStatus
 
-
 def generate_receipt_pdf(sale_order):
-    """Generates official CRAVEABLES branded printable PDF receipt for completed sales."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=48, leftMargin=48, topMargin=36, bottomMargin=36)
     elements = []
@@ -71,7 +70,7 @@ def generate_receipt_pdf(sale_order):
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E9D8B8'), spaceBefore=2, spaceAfter=10))
 
     elements.append(Paragraph(f"<b>Official Sales Receipt:</b> {sale_order.receipt_number}", meta_style))
-    elements.append(Paragraph(f"<b>Date:</b> {sale_order.sale_date.strftime('%B %d, %Y') if hasattr(sale_order.sale_date, 'strftime') else str(sale_order.sale_date)}", meta_style))
+    elements.append(Paragraph(f"<b>Date:</b> {sale_order.sale_date.strftime('%B %d, %Y')}", meta_style))
     elements.append(Paragraph(f"<b>Customer:</b> {sale_order.customer_name or 'Valued Customer'}", meta_style))
     elements.append(Paragraph(f"<b>Payment Method:</b> {sale_order.payment_method}", meta_style))
     elements.append(Spacer(1, 8))
@@ -79,14 +78,11 @@ def generate_receipt_pdf(sale_order):
     items_table_data = [['Item Description', 'Qty', 'Unit Price', 'Total']]
     for item in sale_order.items.all():
         items_table_data.append([
-            item.product_variant.display_name if item.product_variant else 'Bake Item',
+            item.product_variant.display_name,
             str(item.quantity),
             f"₱{float(item.selling_price):,.2f}",
             f"₱{float(item.total_price):,.2f}"
         ])
-
-    if not sale_order.items.exists():
-        items_table_data.append([sale_order.notes or 'Completed Order Items', '1', f"₱{float(sale_order.total_sales):,.2f}", f"₱{float(sale_order.total_sales):,.2f}"])
 
     t = Table(items_table_data, colWidths=[280, 50, 90, 96])
     t.setStyle(TableStyle([
@@ -104,7 +100,7 @@ def generate_receipt_pdf(sale_order):
 
     summary_data = [
         ['Subtotal:', f"₱{float(sale_order.subtotal):,.2f}"],
-        ['Discount / Savings:', f"-₱{float(sale_order.discount):,.2f}" if sale_order.discount > 0 else "₱0.00"],
+        ['Discount / Wholesale Savings:', f"-₱{float(sale_order.discount):,.2f}" if sale_order.discount > 0 else "₱0.00"],
         ['Total Amount Paid:', f"₱{float(sale_order.total_sales):,.2f}"],
     ]
     t_sum = Table(summary_data, colWidths=[350, 166])
@@ -129,9 +125,7 @@ def generate_receipt_pdf(sale_order):
     response['Content-Disposition'] = f'attachment; filename="CRAVEABLES-Receipt-{sale_order.receipt_number}.pdf"'
     return response
 
-
 def generate_inquiry_receipt_pdf(inquiry):
-    """Generates official CRAVEABLES branded printable PDF receipt/invoice for customer orders."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=48, leftMargin=48, topMargin=36, bottomMargin=36)
     elements = []
@@ -233,123 +227,6 @@ def generate_inquiry_receipt_pdf(inquiry):
     response['Content-Disposition'] = f'attachment; filename="CRAVEABLES-Order-{order_num}.pdf"'
     return response
 
-
-class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all().order_by('name')
-    serializer_class = CustomerSerializer
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        search = self.request.query_params.get('search')
-        if search:
-            qs = qs.filter(
-                Q(name__icontains=search) |
-                Q(phone__icontains=search) |
-                Q(email__icontains=search)
-            )
-        return qs
-
-    @action(detail=True, methods=['get'], url_path='history')
-    def customer_history(self, request, pk=None):
-        customer = self.get_object()
-        orders = customer.orders.all().order_by('-created_at')
-        payments = customer.payments.all().order_by('-payment_date', '-id')
-        return Response({
-            'customer': CustomerSerializer(customer).data,
-            'orders': CustomerInquirySerializer(orders, many=True).data,
-            'payments': CustomerPaymentSerializer(payments, many=True).data,
-        })
-
-
-class CustomerPaymentViewSet(viewsets.ModelViewSet):
-    queryset = CustomerPayment.objects.all().select_related('order', 'customer', 'recorded_by').order_by('-payment_date', '-id')
-    serializer_class = CustomerPaymentSerializer
-
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        order_id = data.get('order')
-        if not order_id:
-            return Response({'detail': 'Order reference is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            order = CustomerInquiry.objects.select_for_update().get(id=order_id)
-        except CustomerInquiry.DoesNotExist:
-            return Response({'detail': 'Customer order not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        amount = Decimal(str(data.get('amount', '0.00')))
-        if amount <= 0:
-            return Response({'detail': 'Payment amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        payment_method = data.get('payment_method', PaymentMethod.CASH)
-        reference_number = data.get('reference_number', '')
-        payment_date = data.get('payment_date') or timezone.now().date()
-        notes = data.get('notes', '')
-
-        payment = CustomerPayment.objects.create(
-            order=order,
-            customer=order.customer,
-            payment_date=payment_date,
-            amount=amount,
-            payment_method=payment_method,
-            reference_number=reference_number,
-            notes=notes,
-            recorded_by=request.user if request.user.is_authenticated else None
-        )
-
-        order.amount_paid = (order.amount_paid or Decimal('0.00')) + amount
-        order.save()
-
-        if order.converted_sale:
-            sale = order.converted_sale
-            sale.notes = f"{sale.notes}\n[Payment of ₱{amount:.2f} via {payment_method} recorded on {payment_date}]".strip()
-            sale.save()
-
-        serializer = self.get_serializer(payment)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    @transaction.atomic
-    def destroy(self, request, *args, **kwargs):
-        payment = self.get_object()
-        order = payment.order
-        order.amount_paid = max(Decimal('0.00'), (order.amount_paid or Decimal('0.00')) - payment.amount)
-        order.save()
-        return super().destroy(request, *args, **kwargs)
-
-
-class FeaturedOrderViewSet(viewsets.ModelViewSet):
-    queryset = FeaturedOrder.objects.all().order_by('display_order', '-created_at')
-    serializer_class = FeaturedOrderSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-
-    def get_permissions(self):
-        return [AllowAny()]
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        include_all = self.request.query_params.get('all') == 'true'
-        category = self.request.query_params.get('category')
-        if not self.request.user.is_authenticated and not include_all:
-            qs = qs.filter(is_published=True)
-        if category and category.lower() != 'all':
-            qs = qs.filter(category__iexact=category)
-        return qs
-
-    @action(detail=True, methods=['post'], url_path='toggle-featured')
-    def toggle_featured(self, request, pk=None):
-        order = self.get_object()
-        order.is_featured = not order.is_featured
-        order.save()
-        return Response(self.get_serializer(order).data)
-
-    @action(detail=True, methods=['post'], url_path='toggle-published')
-    def toggle_published(self, request, pk=None):
-        order = self.get_object()
-        order.is_published = not order.is_published
-        order.save()
-        return Response(self.get_serializer(order).data)
-
-
 class SaleOrderViewSet(viewsets.ModelViewSet):
     queryset = SaleOrder.objects.all().prefetch_related(
         'items__product_variant__product'
@@ -357,14 +234,6 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     serializer_class = SaleOrderSerializer
 
     def get_queryset(self):
-        # Auto-backfill completed customer inquiries into official SaleOrders so sales register is always accurate
-        completed_unconverted = CustomerInquiry.objects.filter(status=InquiryStatus.COMPLETED, converted_sale__isnull=True)
-        for inq in completed_unconverted:
-            try:
-                inq.auto_create_sale_order()
-            except Exception:
-                pass
-
         qs = super().get_queryset()
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
@@ -476,6 +345,7 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             variant = item.product_variant
             variant.current_finished_stock += item.quantity
             variant.save()
+        # Delete or zero out
         order_num = order.receipt_number
         order.delete()
         return Response({'detail': f'Sale order {order_num} has been undone and stock restored.'})
@@ -501,10 +371,130 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             'total_units_sold': total_units,
         })
 
+
     @action(detail=True, methods=['get'], url_path='receipt-pdf')
     def download_receipt(self, request, pk=None):
         order = self.get_object()
         return generate_receipt_pdf(order)
+
+
+class CustomerViewSet(viewsets.ModelViewSet):
+    queryset = Customer.objects.all().order_by('name')
+    serializer_class = CustomerSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(email__icontains=search)
+            )
+        return qs
+
+    @action(detail=True, methods=['get'], url_path='history')
+    def customer_history(self, request, pk=None):
+        customer = self.get_object()
+        orders = customer.orders.all().order_by('-created_at')
+        payments = customer.payments.all().order_by('-payment_date', '-id')
+        return Response({
+            'customer': CustomerSerializer(customer).data,
+            'orders': CustomerInquirySerializer(orders, many=True).data,
+            'payments': CustomerPaymentSerializer(payments, many=True).data,
+        })
+
+class CustomerPaymentViewSet(viewsets.ModelViewSet):
+    queryset = CustomerPayment.objects.all().select_related('order', 'customer', 'recorded_by').order_by('-payment_date', '-id')
+    serializer_class = CustomerPaymentSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        order_id = data.get('order')
+        if not order_id:
+            return Response({'detail': 'Order reference is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            order = CustomerInquiry.objects.select_for_update().get(id=order_id)
+        except CustomerInquiry.DoesNotExist:
+            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        amount = Decimal(str(data.get('amount', '0.00')))
+        if amount <= 0:
+            return Response({'detail': 'Payment amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        payment_method = data.get('payment_method', PaymentMethod.CASH)
+        reference_number = data.get('reference_number', '')
+        notes = data.get('notes', '')
+        payment_date = data.get('payment_date') or timezone.now().date()
+
+        payment = CustomerPayment.objects.create(
+            order=order,
+            customer=order.customer,
+            payment_date=payment_date,
+            amount=amount,
+            payment_method=payment_method,
+            reference_number=reference_number,
+            notes=notes,
+            recorded_by=request.user if request.user.is_authenticated else None
+        )
+
+        # Update order's amount_paid and recalculate balance/status
+        order.amount_paid = (order.amount_paid or Decimal('0.00')) + amount
+        order.save()
+
+        # If order has a linked sale order, update its notes
+        if order.converted_sale:
+            sale = order.converted_sale
+            sale.notes = f"{sale.notes}\n[Payment of ₱{amount:.2f} via {payment_method} recorded on {payment_date}]".strip()
+            sale.save()
+
+        serializer = self.get_serializer(payment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        payment = self.get_object()
+        order = payment.order
+        order.amount_paid = max(Decimal('0.00'), (order.amount_paid or Decimal('0.00')) - payment.amount)
+        order.save()
+        return super().destroy(request, *args, **kwargs)
+
+class FeaturedOrderViewSet(viewsets.ModelViewSet):
+    queryset = FeaturedOrder.objects.all().order_by('display_order', '-created_at')
+    serializer_class = FeaturedOrderSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [AllowAny()]  # Admin actions can be executed
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        include_all = self.request.query_params.get('all') == 'true'
+        category = self.request.query_params.get('category')
+        if not self.request.user.is_authenticated and not include_all:
+            qs = qs.filter(is_published=True)
+        if category and category.lower() != 'all':
+            qs = qs.filter(category__iexact=category)
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='toggle-featured')
+    def toggle_featured(self, request, pk=None):
+        order = self.get_object()
+        order.is_featured = not order.is_featured
+        order.save()
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=['post'], url_path='toggle-published')
+    def toggle_published(self, request, pk=None):
+        order = self.get_object()
+        order.is_published = not order.is_published
+        order.save()
+        return Response(self.get_serializer(order).data)
+
 
 
 class CustomerInquiryViewSet(viewsets.ModelViewSet):
@@ -513,14 +503,6 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        # Auto-convert any completed inquiries
-        completed_unconverted = CustomerInquiry.objects.filter(status=InquiryStatus.COMPLETED, converted_sale__isnull=True)
-        for inq in completed_unconverted:
-            try:
-                inq.auto_create_sale_order()
-            except Exception:
-                pass
-
         qs = super().get_queryset()
         status_param = self.request.query_params.get('status')
         payment_status = self.request.query_params.get('payment_status')
@@ -561,11 +543,13 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         notes = data.get('notes', '')
         initial_status = data.get('status', InquiryStatus.PENDING)
 
+        # Payment options
         payment_type = data.get('payment_type', 'PAY_ON_PICKUP')
         initial_deposit = Decimal(str(data.get('initial_deposit', '0.00')))
         payment_due_date = data.get('payment_due_date') or None
         payment_notes = data.get('payment_notes', '')
 
+        # Customer Profile Linking / Creation (prevents duplicate customer records)
         customer = None
         if customer_phone:
             customer = Customer.objects.filter(phone=customer_phone).first()
@@ -581,6 +565,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
                 notes=f"First order placed on {timezone.now().strftime('%Y-%m-%d')}"
             )
         elif customer:
+            # Update customer details if provided
             if customer_email and not customer.email:
                 customer.email = customer_email
             if delivery_address and not customer.address:
@@ -610,6 +595,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             payment_notes=payment_notes,
         )
 
+        # If an initial deposit was made, record a CustomerPayment transaction
         if initial_deposit > 0:
             payment_method = data.get('payment_method', PaymentMethod.GCASH)
             ref_num = data.get('payment_reference', '')
@@ -666,6 +652,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         inquiry.amount_paid = (inquiry.amount_paid or Decimal('0.00')) + amount
         inquiry.save()
 
+        # Update linked sale notes if present
         if inquiry.converted_sale:
             sale = inquiry.converted_sale
             sale.notes = f"{sale.notes}\n[Payment: ₱{amount:.2f} via {payment_method} on {payment_date}]".strip()
@@ -692,6 +679,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             name = item.get('name', '')
             qty = int(item.get('qty', 1))
 
+            # Match variant by name
             variant = ProductVariant.objects.filter(name__icontains=name.split('—')[0].strip()).first()
             if not variant:
                 variant = ProductVariant.objects.first()
@@ -718,6 +706,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
                 created_by=request.user if request.user.is_authenticated else None
             )
 
+            # Record initial ingredient usages snapshot from recipe without deducting inventory yet!
             total_ing_cost = Decimal('0.00')
             for ri in recipe.recipe_ingredients.all():
                 needed = ri.quantity_used * batches
@@ -754,7 +743,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='convert-to-sale')
     @transaction.atomic
     def convert_to_sale(self, request, pk=None):
-        """Order-to-Sales Integration: converts inquiry to official SaleOrder"""
+        """Order-to-Sales Integration (Section 3B): Prevents duplicate sales and links customer"""
         inquiry = self.get_object()
         if inquiry.converted_sale:
             return Response({
@@ -764,7 +753,25 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
                 'inquiry': self.get_serializer(inquiry).data
             })
 
-        sale_order = inquiry.auto_create_sale_order()
+        payment_method = request.data.get('payment_method', PaymentMethod.GCASH)
+        notes = f"Converted from Customer Order {inquiry.inquiry_number}. {inquiry.notes}".strip()
+
+        sale_order = SaleOrder.objects.create(
+            receipt_number=inquiry.shared_order_number or f"CRV-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            sale_date=timezone.now().date(),
+            customer=inquiry.customer,
+            customer_name=inquiry.customer_name,
+            payment_method=payment_method,
+            subtotal=inquiry.estimated_total,
+            discount=Decimal('0.00'),
+            total_sales=inquiry.estimated_total,
+            total_cogs=Decimal('0.00'),
+            gross_profit=inquiry.estimated_total,
+            notes=notes,
+            created_by=request.user if request.user.is_authenticated else None
+        )
+
+        inquiry.converted_sale = sale_order
         inquiry.status = InquiryStatus.COMPLETED
         inquiry.save()
 
@@ -776,6 +783,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='receivables-summary')
     def receivables_summary(self, request):
+        """Receivables and Payment Monitoring (Section 6C & Section 8)"""
         today = timezone.now().date()
         week_ahead = today + timezone.timedelta(days=7)
 
@@ -818,6 +826,8 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             'overdue_amount': float(overdue_orders.aggregate(s=Sum('remaining_balance'))['s'] or 0),
             'upcoming_payments': upcoming_payments_list
         })
+
+
 
     @action(detail=True, methods=['get'], url_path='receipt-pdf')
     def download_receipt(self, request, pk=None):
@@ -875,3 +885,5 @@ class CustomerReviewViewSet(viewsets.ModelViewSet):
         review.is_approved = False
         review.save()
         return Response(self.get_serializer(review).data)
+
+
