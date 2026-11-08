@@ -14,10 +14,10 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-from apps.sales.models import SaleOrder, SaleItem, CustomerInquiry
+from apps.sales.models import SaleOrder, SaleItem, CustomerInquiry, Customer, CustomerPayment
 from apps.expenses.models import Expense
 from apps.inventory.models import Ingredient, StockTransaction
-from apps.production.models import ProductionOrder
+from apps.production.models import ProductionOrder, ProductionIngredientUsage
 from apps.costing.models import Recipe
 from apps.products.models import ProductVariant
 
@@ -316,6 +316,95 @@ def export_excel_report(request):
             e.receipt_reference
         ])
 
+    # Sheet 6: Customer Orders & Receivables
+    ws_orders = wb.create_sheet('Customer Orders & Receivables')
+    ws_orders['A1'] = "CRAVEABLES | CUSTOMER ORDERS & ACCOUNTS RECEIVABLE"
+    ws_orders['A1'].font = title_font
+    ws_orders.append([])
+    headers_ord = [
+        "Order Ref", "Customer Name", "Phone", "Target Date", "Order Type",
+        "Delivery Method", "Total (₱)", "Paid (₱)", "Balance (₱)", "Due Date",
+        "Payment Status", "Order Status", "Items Summary"
+    ]
+    ws_orders.append(headers_ord)
+    for col in range(1, len(headers_ord) + 1):
+        cell = ws_orders.cell(3, col)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    for inq in CustomerInquiry.objects.all().order_by('-created_at'):
+        ws_orders.append([
+            inq.shared_order_number or inq.inquiry_number,
+            inq.customer_name,
+            inq.customer_phone,
+            inq.target_date.strftime('%Y-%m-%d') if inq.target_date else 'Immediate',
+            inq.order_type,
+            inq.delivery_method,
+            float(inq.estimated_total or 0),
+            float(inq.amount_paid or 0),
+            float(inq.remaining_balance or 0),
+            inq.payment_due_date.strftime('%Y-%m-%d') if inq.payment_due_date else 'N/A',
+            inq.payment_status,
+            inq.status,
+            inq.items_summary
+        ])
+
+    # Sheet 7: Production Batches & Yield Analysis
+    ws_prod = wb.create_sheet('Production Batches')
+    ws_prod['A1'] = "CRAVEABLES | PRODUCTION RUNS & INVENTORY DEDUCTIONS"
+    ws_prod['A1'].font = title_font
+    ws_prod.append([])
+    headers_prod = [
+        "Production #", "Date", "Order Ref", "Recipe / Product", "Variant",
+        "Batches", "Planned Yield", "Actual Yield", "Total Cost (₱)", "Cost/Unit (₱)",
+        "Status", "Customized", "Adjustment Reason"
+    ]
+    ws_prod.append(headers_prod)
+    for col in range(1, len(headers_prod) + 1):
+        cell = ws_prod.cell(3, col)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    for po in ProductionOrder.objects.all().order_by('-production_date', '-id'):
+        ws_prod.append([
+            po.production_number,
+            po.production_date.strftime('%Y-%m-%d') if po.production_date else '',
+            po.order_number_ref or 'Internal Batch',
+            po.recipe.product_variant.product.name if po.recipe else 'N/A',
+            po.recipe.product_variant.name if po.recipe else 'N/A',
+            float(po.batches_count),
+            po.planned_yield,
+            po.actual_yield or po.planned_yield,
+            float(po.total_production_cost or 0),
+            float(po.cost_per_unit or 0),
+            po.status,
+            "Yes" if po.is_customized else "No",
+            po.adjustment_reason or ""
+        ])
+
+    # Sheet 8: Customer Payments History
+    ws_pay = wb.create_sheet('Payment Transactions')
+    ws_pay['A1'] = "CRAVEABLES | CUSTOMER PAYMENT TRANSACTIONS"
+    ws_pay['A1'].font = title_font
+    ws_pay.append([])
+    headers_pay = ["Payment Date", "Order Ref", "Customer", "Amount (₱)", "Method", "Reference #", "Notes"]
+    ws_pay.append(headers_pay)
+    for col in range(1, len(headers_pay) + 1):
+        cell = ws_pay.cell(3, col)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    for cp in CustomerPayment.objects.all().order_by('-payment_date', '-id'):
+        ws_pay.append([
+            cp.payment_date.strftime('%Y-%m-%d') if cp.payment_date else '',
+            cp.order.shared_order_number or cp.order.inquiry_number,
+            cp.customer.name if cp.customer else cp.order.customer_name,
+            float(cp.amount),
+            cp.payment_method,
+            cp.reference_number,
+            cp.notes
+        ])
+
     # Save to buffer
     output = io.BytesIO()
     wb.save(output)
@@ -434,6 +523,34 @@ def export_pdf_report(request):
         elements.append(t_alert)
     else:
         elements.append(Paragraph("All ingredients are currently at healthy stock levels.", styles['Normal']))
+
+    # Customer Orders & Receivables Table
+    elements.append(Spacer(1, 15))
+    elements.append(Paragraph("Active Customer Orders & Accounts Receivable", h2_style))
+    open_orders = CustomerInquiry.objects.exclude(status='CANCELLED').order_by('-created_at')[:8]
+    if open_orders.exists():
+        ord_data = [['Order Ref', 'Customer', 'Target Date', 'Total', 'Paid', 'Balance', 'Status']]
+        for o in open_orders:
+            ord_data.append([
+                o.shared_order_number or o.inquiry_number,
+                o.customer_name[:18],
+                o.target_date.strftime('%Y-%m-%d') if o.target_date else 'Immediate',
+                f"₱{float(o.estimated_total):,.2f}",
+                f"₱{float(o.amount_paid):,.2f}",
+                f"₱{float(o.remaining_balance):,.2f}",
+                o.payment_status
+            ])
+        t_ord = Table(ord_data, colWidths=[90, 110, 75, 75, 75, 75, 70])
+        t_ord.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3B170B')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E9D8B8')),
+        ]))
+        elements.append(t_ord)
+    else:
+        elements.append(Paragraph("No active open orders.", styles['Normal']))
 
     doc.build(elements)
     buffer.seek(0)

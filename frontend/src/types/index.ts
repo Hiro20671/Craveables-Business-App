@@ -144,9 +144,26 @@ export interface Recipe {
   recipe_ingredients: RecipeIngredient[];
 }
 
+export interface ProductionIngredientUsage {
+  id: number;
+  ingredient: number;
+  ingredient_name: string;
+  current_stock?: string | number;
+  required_quantity: string | number;
+  actual_quantity_used: string | number;
+  original_recipe_quantity?: string | number;
+  is_additional?: boolean;
+  unit: string;
+  unit_cost_snapshot: string | number;
+  total_cost: string | number;
+  notes?: string;
+}
+
 export interface ProductionOrder {
   id: number;
   production_number: string;
+  order_number_ref?: string;
+  customer_inquiry?: number | null;
   recipe: number;
   recipe_name: string;
   product_variant: number;
@@ -157,9 +174,13 @@ export interface ProductionOrder {
   planned_yield: number;
   actual_yield: number;
   status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  is_customized?: boolean;
+  adjustment_reason?: string;
+  adjusted_by_name?: string;
   total_production_cost: string | number;
   cost_per_unit: string | number;
   notes: string;
+  ingredient_usages?: ProductionIngredientUsage[];
   created_at: string;
   completed_at: string | null;
 }
@@ -271,20 +292,126 @@ export interface DashboardStats {
   pending_inquiries_count?: number;
 }
 
+export interface CustomerPayment {
+  id: number;
+  order: number;
+  order_number: string;
+  customer?: number | null;
+  customer_name?: string;
+  payment_date: string;
+  amount: number | string;
+  payment_method: string;
+  reference_number: string;
+  notes: string;
+  recorded_by_name?: string;
+  created_at: string;
+}
+
+export interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  total_orders: number;
+  total_ordered_amount: number | string;
+  total_paid_amount: number | string;
+  total_outstanding_balance: number | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeaturedOrder {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  image_url?: string;
+  category: string;
+  order_type: string;
+  order_date: string | null;
+  pieces_count: number | null;
+  is_featured: boolean;
+  is_published: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrderWorkflowStatus =
+  | 'NEW'
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'AWAITING_PAYMENT'
+  | 'SCHEDULED_PRODUCTION'
+  | 'BAKING'
+  | 'READY'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type PaymentStatusType =
+  | 'PAID'
+  | 'PARTIALLY_PAID'
+  | 'UNPAID'
+  | 'DUE_SOON'
+  | 'OVERDUE';
+
 export interface CustomerInquiry {
   id: number;
   inquiry_number: string;
+  shared_order_number?: string;
+  customer?: number | null;
+  customer_details?: Customer | null;
   customer_name: string;
   customer_phone: string;
+  order_type?: string;
+  delivery_method?: string;
+  delivery_address?: string;
+  special_instructions?: string;
   target_date: string | null;
   items_summary: string;
-  items_json: Array<{ name: string; price: number; qty: number }>;
+  items_json: Array<{ name: string; price: number; qty: number; notes?: string }>;
   estimated_total: string | number;
   notes: string;
-  status: 'PENDING' | 'CONFIRMED' | 'BAKING' | 'COMPLETED' | 'CANCELLED';
+  status: OrderWorkflowStatus;
+  payment_type?: string;
+  initial_deposit?: string | number;
+  amount_paid?: string | number;
+  remaining_balance?: string | number;
+  payment_due_date?: string | null;
+  payment_status?: PaymentStatusType;
+  payment_notes?: string;
   converted_sale?: number | null;
+  payments?: CustomerPayment[];
   created_at: string;
   updated_at: string;
+}
+
+export interface UpcomingPayment {
+  id: number;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  remaining_balance: number;
+  amount_paid: number;
+  estimated_total: number;
+  payment_due_date: string | null;
+  days_remaining: number | null;
+  payment_status: PaymentStatusType;
+}
+
+export interface ReceivablesSummary {
+  total_receivables: number;
+  unpaid_count: number;
+  partial_count: number;
+  due_today_count: number;
+  due_today_amount: number;
+  due_this_week_count: number;
+  due_this_week_amount: number;
+  overdue_count: number;
+  overdue_amount: number;
+  upcoming_payments: UpcomingPayment[];
 }
 
 export interface CustomerReview {

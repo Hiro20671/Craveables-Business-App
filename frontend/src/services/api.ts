@@ -1,10 +1,11 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') + '/api';
 
-function getAuthHeaders(): HeadersInit {
+function getAuthHeaders(isFormData = false): HeadersInit {
   const token = localStorage.getItem('craveables_token');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (token) {
     headers['Authorization'] = `Token ${token}`;
   }
@@ -13,10 +14,11 @@ function getAuthHeaders(): HeadersInit {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(url, {
     ...options,
     headers: {
-      ...getAuthHeaders(),
+      ...getAuthHeaders(isFormData),
       ...(options.headers || {}),
     },
   });
@@ -103,10 +105,14 @@ export const api = {
 
   // Production
   getProductionOrders: () => request<any[]>('/production/orders/'),
-  checkProductionRequirements: (recipeId: number, batchesCount: number) =>
+  checkProductionRequirements: (recipeId: number, batchesCount: number, customIngredients?: any[]) =>
     request<any>('/production/orders/check-requirements/', {
       method: 'POST',
-      body: JSON.stringify({ recipe: recipeId, batches_count: batchesCount }),
+      body: JSON.stringify({
+        recipe: recipeId,
+        batches_count: batchesCount,
+        custom_ingredients: customIngredients,
+      }),
     }),
   createProductionOrder: (data: any) => request<any>('/production/orders/', { method: 'POST', body: JSON.stringify(data) }),
   completeProductionOrder: (id: number, actualYield?: number) =>
@@ -114,12 +120,63 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ actual_yield: actualYield }),
     }),
+  adjustProductionIngredients: (id: number, data: { custom_ingredients: any[]; adjustment_reason?: string; batches_count?: number; actual_yield?: number }) =>
+    request<any>(`/production/orders/${id}/adjust-ingredients/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   undoProductionOrder: (id: number) =>
     request<any>(`/production/orders/${id}/undo/`, { method: 'POST' }),
   deleteProductionOrder: (id: number) =>
     request<void>(`/production/orders/${id}/`, { method: 'DELETE' }),
   updateProductionOrder: (id: number, data: any) =>
     request<any>(`/production/orders/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // Featured Orders (Public Gallery & Admin Uploads)
+  getFeaturedOrders: (params?: { category?: string; all?: boolean }) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any[]>(`/sales/featured-orders/${q ? `?${q}` : ''}`);
+  },
+  createFeaturedOrder: (formData: FormData) =>
+    request<any>('/sales/featured-orders/', { method: 'POST', body: formData }),
+  updateFeaturedOrder: (id: number, formData: FormData | any) =>
+    request<any>(`/sales/featured-orders/${id}/`, {
+      method: 'PATCH',
+      body: formData instanceof FormData ? formData : JSON.stringify(formData),
+    }),
+  deleteFeaturedOrder: (id: number) =>
+    request<void>(`/sales/featured-orders/${id}/`, { method: 'DELETE' }),
+  toggleFeaturedOrder: (id: number) =>
+    request<any>(`/sales/featured-orders/${id}/toggle-featured/`, { method: 'POST' }),
+  togglePublishedOrder: (id: number) =>
+    request<any>(`/sales/featured-orders/${id}/toggle-published/`, { method: 'POST' }),
+
+  // Customer Management Database
+  getCustomers: (params?: { search?: string }) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any[]>(`/sales/customers/${q ? `?${q}` : ''}`);
+  },
+  getCustomer: (id: number) => request<any>(`/sales/customers/${id}/`),
+  getCustomerHistory: (id: number) => request<any>(`/sales/customers/${id}/history/`),
+  createCustomer: (data: any) =>
+    request<any>('/sales/customers/', { method: 'POST', body: JSON.stringify(data) }),
+  updateCustomer: (id: number, data: any) =>
+    request<any>(`/sales/customers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteCustomer: (id: number) => request<void>(`/sales/customers/${id}/`, { method: 'DELETE' }),
+
+  // Customer Payments & Accounts Receivable
+  getPayments: (params?: { order?: number; customer?: number }) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any[]>(`/sales/payments/${q ? `?${q}` : ''}`);
+  },
+  recordPayment: (data: { order: number; amount: number; payment_method: string; reference_number?: string; notes?: string; payment_date?: string }) =>
+    request<any>('/sales/payments/', { method: 'POST', body: JSON.stringify(data) }),
+  deletePayment: (id: number) => request<void>(`/sales/payments/${id}/`, { method: 'DELETE' }),
+  getReceivablesSummary: () => request<any>('/sales/inquiries/receivables-summary/'),
+  recordOrderPayment: (orderId: number, data: { amount: number; payment_method: string; reference_number?: string; notes?: string; payment_date?: string }) =>
+    request<any>(`/sales/inquiries/${orderId}/record-payment/`, { method: 'POST', body: JSON.stringify(data) }),
+  createProductionFromOrder: (orderId: number) =>
+    request<any>(`/sales/inquiries/${orderId}/create-production/`, { method: 'POST' }),
 
   // Sales & Orders
   getSales: (params?: { start_date?: string; end_date?: string; payment_method?: string; search?: string }) => {

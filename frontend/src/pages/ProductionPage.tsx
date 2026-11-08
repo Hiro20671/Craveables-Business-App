@@ -14,21 +14,38 @@ import {
   TrendingDown,
   RotateCcw,
   Trash2,
-  Pencil
+  Pencil,
+  Sliders,
+  PlusCircle,
+  AlertCircle,
+  Info,
+  Check
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../services/api';
-import { ProductionOrder, Recipe } from '../types';
+import { ProductionOrder, Recipe, Ingredient } from '../types';
+
+interface CustomBatchIngredient {
+  ingredient_id: number;
+  ingredient_name: string;
+  unit: string;
+  base_qty: number;
+  custom_qty: number;
+  cost_per_unit: number;
+  is_additional: boolean;
+  notes?: string;
+}
 
 export const ProductionPage: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
 
   // New Production Wizard Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null);
-  const [batchesCount, setBatchesCount] = useState<number>(1);
+  const [batchesCountInput, setBatchesCountInput] = useState<string>('1');
   const [productionDate, setProductionDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -37,15 +54,46 @@ export const ProductionPage: React.FC = () => {
   const [stockCheckResult, setStockCheckResult] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Custom ingredients on-the-fly (Section 4 & Test 4)
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [customIngredients, setCustomIngredients] = useState<CustomBatchIngredient[]>([]);
+  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [selectedExtraId, setSelectedExtraId] = useState<number | ''>('');
+  const [extraQuantity, setExtraQuantity] = useState<string>('');
+
+  // Compute clean numeric batch count (fallback to 1 if user is currently typing or empty)
+  const parsedBatches = parseFloat(batchesCountInput);
+  const effectiveBatches = !isNaN(parsedBatches) && parsedBatches > 0 ? parsedBatches : 1;
+
+  const handleBatchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') {
+      setBatchesCountInput('');
+      return;
+    }
+    setBatchesCountInput(val);
+  };
+
+  const handleBatchInputBlur = () => {
+    const val = parseFloat(batchesCountInput);
+    if (isNaN(val) || val <= 0) {
+      setBatchesCountInput('1');
+    } else {
+      setBatchesCountInput(String(val));
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [ords, recs] = await Promise.all([
+      const [ords, recs, ings] = await Promise.all([
         api.getProductionOrders(),
         api.getRecipes(),
+        api.getIngredients().catch(() => []),
       ]);
       setOrders(ords);
       setRecipes(recs);
+      setAllIngredients(ings);
 
       if (recs.length > 0 && !selectedRecipeId) {
         setSelectedRecipeId(recs[0].id);
@@ -61,7 +109,7 @@ export const ProductionPage: React.FC = () => {
     fetchData();
   }, []);
 
-  // When recipe or batches change in wizard, re-check requirements
+  // When recipe or batches change, check requirements and sync custom ingredients
   useEffect(() => {
     if (!selectedRecipeId || !isModalOpen) return;
 
@@ -69,9 +117,22 @@ export const ProductionPage: React.FC = () => {
     const runCheck = async () => {
       setCheckingStock(true);
       try {
-        const res = await api.checkProductionRequirements(selectedRecipeId, batchesCount);
+        const res = await api.checkProductionRequirements(selectedRecipeId, effectiveBatches);
         if (active) {
           setStockCheckResult(res);
+          // Sync base ingredients into custom list if not currently actively customized
+          if (!isCustomizing && res?.requirements) {
+            const initialList: CustomBatchIngredient[] = res.requirements.map((req: any) => ({
+              ingredient_id: req.ingredient_id,
+              ingredient_name: req.ingredient_name,
+              unit: req.unit,
+              base_qty: req.required_quantity,
+              custom_qty: req.required_quantity,
+              cost_per_unit: req.cost_per_unit || 0,
+              is_additional: false,
+            }));
+            setCustomIngredients(initialList);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -84,30 +145,128 @@ export const ProductionPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [selectedRecipeId, batchesCount, isModalOpen]);
+  }, [selectedRecipeId, effectiveBatches, isModalOpen]);
 
   const handleOpenModal = () => {
     if (recipes.length > 0) {
       setSelectedRecipeId(recipes[0].id);
     }
-    setBatchesCount(1);
+    setBatchesCountInput('1');
     setProductionDate(new Date().toISOString().split('T')[0]);
     setProductionNotes('');
+    setIsCustomizing(false);
+    setAdjustmentReason('');
+    setSelectedExtraId('');
+    setExtraQuantity('');
     setIsModalOpen(true);
   };
 
+  // Handle custom ingredient quantity edit
+  const handleUpdateCustomQty = (index: number, newQtyStr: string) => {
+    const val = parseFloat(newQtyStr);
+    setCustomIngredients((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], custom_qty: isNaN(val) ? 0 : val };
+      return next;
+    });
+  };
+
+  // Add extra ingredient on-the-fly
+  const handleAddExtraIngredient = () => {
+    if (!selectedExtraId) {
+      alert('Please select an ingredient from inventory to add');
+      return;
+    }
+    const qty = parseFloat(extraQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      alert('Please enter a valid quantity greater than 0');
+      return;
+    }
+
+    const targetIng = allIngredients.find((i) => i.id === Number(selectedExtraId));
+    if (!targetIng) return;
+
+    // Check if already in list
+    const existingIdx = customIngredients.findIndex((ci) => ci.ingredient_id === targetIng.id);
+    if (existingIdx >= 0) {
+      setCustomIngredients((prev) => {
+        const next = [...prev];
+        next[existingIdx] = {
+          ...next[existingIdx],
+          custom_qty: next[existingIdx].custom_qty + qty,
+          is_additional: true,
+        };
+        return next;
+      });
+    } else {
+      setCustomIngredients((prev) => [
+        ...prev,
+        {
+          ingredient_id: targetIng.id,
+          ingredient_name: targetIng.name,
+          unit: targetIng.unit,
+          base_qty: 0,
+          custom_qty: qty,
+          cost_per_unit: Number(targetIng.cost_per_unit || 0),
+          is_additional: true,
+          notes: 'Added on-the-fly for batch',
+        },
+      ]);
+    }
+
+    setSelectedExtraId('');
+    setExtraQuantity('');
+  };
+
+  // Remove custom additional ingredient
+  const handleRemoveCustomIngredient = (index: number) => {
+    setCustomIngredients((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Recalculate estimated cost with customizations
+  const calculatedCustomCost = customIngredients.reduce((sum, item) => {
+    return sum + Number(item.custom_qty) * Number(item.cost_per_unit);
+  }, 0);
+
+  const overheadCost =
+    (stockCheckResult?.estimated_total_cost || 0) - (stockCheckResult?.estimated_ingredient_cost || 0);
+  const totalAdjustedBatchCost = isCustomizing
+    ? calculatedCustomCost + overheadCost
+    : stockCheckResult?.estimated_total_cost || 0;
+  const adjustedCostPerUnit =
+    stockCheckResult?.planned_yield && stockCheckResult.planned_yield > 0
+      ? totalAdjustedBatchCost / stockCheckResult.planned_yield
+      : 0;
+
   const handleConfirmProduction = async (immediateComplete: boolean) => {
     if (!selectedRecipeId) return;
+    const finalBatches = parseFloat(batchesCountInput);
+    if (isNaN(finalBatches) || finalBatches <= 0) {
+      alert('Please enter a valid positive number for batches count.');
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const payload = {
+      const payload: any = {
         recipe: selectedRecipeId,
-        batches_count: batchesCount,
+        batches_count: finalBatches,
         production_date: productionDate,
         status: immediateComplete ? 'COMPLETED' : 'PLANNED',
         actual_yield: stockCheckResult?.planned_yield || 0,
         notes: productionNotes,
       };
+
+      if (isCustomizing && customIngredients.length > 0) {
+        payload.is_customized = true;
+        payload.adjustment_reason = adjustmentReason.trim() || 'Custom batch ingredients requested';
+        payload.custom_ingredients = customIngredients.map((ci) => ({
+          ingredient_id: ci.ingredient_id,
+          quantity_used: ci.custom_qty,
+          is_additional: ci.is_additional,
+          notes: ci.notes || '',
+        }));
+      }
 
       await api.createProductionOrder(payload);
 
@@ -211,17 +370,22 @@ export const ProductionPage: React.FC = () => {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm">
         <div>
-          <h1 className="font-display font-bold text-2xl text-bakery-chocolate">
-            Production Management & Baking Batches
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display font-bold text-2xl text-bakery-chocolate">
+              Production Management &amp; Baking Batches
+            </h1>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bakery-caramel/15 text-bakery-caramel border border-bakery-caramel/30">
+              Recipe Preservation Active
+            </span>
+          </div>
           <p className="text-xs text-bakery-muted mt-0.5">
-            Automatic inventory deduction upon batch confirmation &bull; Stock availability checker
+            Automatic inventory deduction upon batch confirmation &bull; Flexible ingredient overrides &bull; Stock sufficiency checker
           </p>
         </div>
 
         <button
           onClick={handleOpenModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108] shadow-warm-sm transition-transform active:scale-95 shrink-0"
         >
           <ChefHat className="w-4 h-4 text-bakery-cream" />
           <span>Start Production Batch</span>
@@ -232,7 +396,7 @@ export const ProductionPage: React.FC = () => {
       <div className="rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm overflow-hidden">
         <div className="p-4 border-b border-bakery-beige bg-bakery-cream/50 flex items-center justify-between">
           <h2 className="font-display font-bold text-base text-bakery-chocolate">
-            Production Orders & Batch History
+            Production Orders &amp; Batch History
           </h2>
           <span className="text-xs text-bakery-muted font-medium">
             Total Batches: {orders.length}
@@ -278,14 +442,30 @@ export const ProductionPage: React.FC = () => {
 
                   return (
                     <tr key={ord.id} className="hover:bg-bakery-cream/30 transition-colors">
-                      <td className="py-3 px-4 font-bold text-bakery-chocolate">
-                        {ord.production_number}
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-bakery-chocolate block">{ord.production_number}</span>
+                        {ord.order_number_ref && (
+                          <span className="font-mono text-[10px] text-bakery-caramel bg-bakery-cream px-1.5 py-0.2 rounded border border-bakery-beige inline-block mt-0.5">
+                            {ord.order_number_ref}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-bakery-muted">
                         {ord.production_date}
                       </td>
-                      <td className="py-3 px-4 font-semibold text-bakery-espresso">
-                        {ord.product_name} &bull; <span className="text-bakery-caramel">{ord.variant_name}</span>
+                      <td className="py-3 px-4">
+                        <span className="font-semibold text-bakery-espresso block">
+                          {ord.product_name} &bull; <span className="text-bakery-caramel">{ord.variant_name}</span>
+                        </span>
+                        {ord.is_customized && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 mt-0.5"
+                            title={ord.adjustment_reason || 'Customized ingredients for batch'}
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-600" />
+                            <span>Customized Batch</span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right font-medium">
                         {ord.batches_count} batch{Number(ord.batches_count) > 1 ? 'es' : ''}
@@ -319,7 +499,7 @@ export const ProductionPage: React.FC = () => {
                               onClick={() => handleCompleteOrder(ord)}
                               className="px-2.5 py-1 rounded-lg bg-status-green text-white text-[10px] font-bold hover:bg-status-green/90 shadow-xs"
                             >
-                              Confirm & Deduct
+                              Confirm &amp; Deduct
                             </button>
                           ) : (
                             <span className="text-[10px] text-status-red font-semibold px-2 py-0.5 rounded bg-status-redLight border border-status-red/20">
@@ -401,16 +581,23 @@ export const ProductionPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">
-                    Batches Count *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-bakery-chocolate">
+                      Batches Count *
+                    </label>
+                    <span className="text-[10px] text-bakery-muted font-normal">
+                      Click to edit / replace
+                    </span>
+                  </div>
                   <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={batchesCount}
-                    onChange={(e) => setBatchesCount(Math.max(0.5, parseFloat(e.target.value) || 1))}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel"
+                    type="text"
+                    inputMode="decimal"
+                    value={batchesCountInput}
+                    onChange={handleBatchInputChange}
+                    onBlur={handleBatchInputBlur}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="Enter batches (e.g. 3)"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel focus:ring-1 focus:ring-bakery-caramel transition-all"
                   />
                 </div>
               </div>
@@ -472,6 +659,154 @@ export const ProductionPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Section 4 & 5: Flexible Production & Editable Ingredients Accordion */}
+              <div className="rounded-2xl border border-bakery-beige bg-white/70 overflow-hidden shadow-2xs">
+                <div
+                  onClick={() => setIsCustomizing(!isCustomizing)}
+                  className="p-3 bg-bakery-cream/80 border-b border-bakery-beige flex items-center justify-between cursor-pointer hover:bg-bakery-cream transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-bakery-caramel" />
+                    <div>
+                      <span className="font-bold text-xs text-bakery-chocolate block">
+                        Customize Ingredients for this Batch (Optional)
+                      </span>
+                      <span className="text-[10px] text-bakery-muted">
+                        Adjust quantities or add extra ingredients without changing the standard recipe.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-bakery-caramel">
+                    {isCustomizing ? 'Hide Customizer ▲' : 'Customize Ingredients ▼'}
+                  </span>
+                </div>
+
+                {isCustomizing && (
+                  <div className="p-4 space-y-4 bg-white animate-fade-in text-xs">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Recipe Preservation Guarantee:</strong> Adjustments made here apply <em>only</em> to this production run. The original master recipe in Recipe Management will stay completely untouched.
+                      </span>
+                    </div>
+
+                    {/* Table of Custom Ingredients */}
+                    <div className="rounded-xl border border-bakery-beige overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-bakery-cream text-[10px] uppercase font-bold text-bakery-muted border-b border-bakery-beige">
+                          <tr>
+                            <th className="p-2">Ingredient</th>
+                            <th className="p-2 text-right">Standard Qty</th>
+                            <th className="p-2 text-right">Batch Custom Qty</th>
+                            <th className="p-2 text-right">Est. Cost (₱)</th>
+                            <th className="p-2 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-bakery-beige/60">
+                          {customIngredients.map((item, idx) => (
+                            <tr key={`${item.ingredient_id}-${idx}`} className="hover:bg-bakery-cream/30">
+                              <td className="p-2 font-semibold text-bakery-chocolate">
+                                {item.ingredient_name}
+                                {item.is_additional && (
+                                  <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-bakery-caramel text-white">
+                                    Extra
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2 text-right text-bakery-muted">
+                                {item.base_qty} {item.unit}
+                              </td>
+                              <td className="p-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={item.custom_qty}
+                                    onChange={(e) => handleUpdateCustomQty(idx, e.target.value)}
+                                    className="w-20 px-2 py-1 rounded-lg border border-bakery-beige text-right text-xs font-bold focus:outline-hidden focus:border-bakery-caramel"
+                                  />
+                                  <span className="text-[10px] text-bakery-muted">{item.unit}</span>
+                                </div>
+                              </td>
+                              <td className="p-2 text-right font-bold text-bakery-chocolate">
+                                ₱{(Number(item.custom_qty) * Number(item.cost_per_unit)).toFixed(2)}
+                              </td>
+                              <td className="p-2 text-center">
+                                {item.is_additional ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomIngredient(idx)}
+                                    className="text-red-600 hover:text-red-800 p-1 font-bold"
+                                    title="Remove extra ingredient"
+                                  >
+                                    ✕
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-bakery-muted">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Add Extra Ingredient Toolbar */}
+                    <div className="p-3 rounded-xl bg-bakery-cream/60 border border-bakery-beige space-y-2">
+                      <span className="text-[11px] font-bold text-bakery-chocolate block">
+                        + Add Extra Raw Ingredient from Inventory
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={selectedExtraId}
+                          onChange={(e) => setSelectedExtraId(e.target.value ? Number(e.target.value) : '')}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-bakery-beige text-xs flex-1 min-w-[180px] focus:outline-hidden"
+                        >
+                          <option value="">Select ingredient (e.g. Choc Chips, Sprinkles)...</option>
+                          {allIngredients.map((ing) => (
+                            <option key={ing.id} value={ing.id}>
+                              {ing.name} ({ing.unit}) — ₱{Number(ing.cost_per_unit || 0).toFixed(2)}/{ing.unit}
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Quantity"
+                          value={extraQuantity}
+                          onChange={(e) => setExtraQuantity(e.target.value)}
+                          className="w-24 px-3 py-1.5 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleAddExtraIngredient}
+                          className="px-3.5 py-1.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] transition-colors flex items-center gap-1"
+                        >
+                          <PlusCircle className="w-3.5 h-3.5 text-bakery-caramel" />
+                          <span>Add to Batch</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Reason for adjustment */}
+                    <div>
+                      <label className="block font-semibold text-bakery-chocolate mb-1">
+                        Adjustment Reason / Customer Request Notes
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Customer requested 50g extra chocolate chips for birthday order"
+                        value={adjustmentReason}
+                        onChange={(e) => setAdjustmentReason(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Batch Production Economics Preview */}
               {stockCheckResult && (
                 <div className="p-3 rounded-xl bg-bakery-cream border border-bakery-beige grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -482,21 +817,25 @@ export const ProductionPage: React.FC = () => {
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-bakery-muted uppercase block">Ingredient Cost</span>
+                    <span className="text-[10px] text-bakery-muted uppercase block">
+                      {isCustomizing ? 'Custom Ingr. Cost' : 'Ingredient Cost'}
+                    </span>
                     <span className="font-display font-bold text-sm text-bakery-chocolate">
-                      ₱{stockCheckResult.estimated_ingredient_cost?.toFixed(2)}
+                      ₱{(isCustomizing ? calculatedCustomCost : stockCheckResult.estimated_ingredient_cost)?.toFixed(2)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-bakery-muted uppercase block">Total Batch Cost</span>
+                    <span className="text-[10px] text-bakery-muted uppercase block">
+                      {isCustomizing ? 'Adjusted Batch Cost' : 'Total Batch Cost'}
+                    </span>
                     <span className="font-display font-bold text-sm text-bakery-chocolate">
-                      ₱{stockCheckResult.estimated_total_cost?.toFixed(2)}
+                      ₱{totalAdjustedBatchCost.toFixed(2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-bakery-muted uppercase block">Cost / Unit</span>
                     <span className="font-display font-bold text-sm text-bakery-caramel">
-                      ₱{stockCheckResult.estimated_cost_per_unit?.toFixed(2)}
+                      ₱{(isCustomizing ? adjustedCostPerUnit : stockCheckResult.estimated_cost_per_unit)?.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -547,17 +886,18 @@ export const ProductionPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleConfirmProduction(true)}
-                  disabled={submitting || !stockCheckResult?.is_sufficient}
+                  disabled={submitting || (!isCustomizing && !stockCheckResult?.is_sufficient)}
                   className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white font-semibold hover:bg-[#2c1108] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-bakery-cream" />
-                  <span>Confirm & Deduct Stock</span>
+                  <span>Confirm &amp; Deduct Stock</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
       {/* Edit Batch Modal */}
       {editOrder && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
@@ -623,4 +963,3 @@ export const ProductionPage: React.FC = () => {
     </div>
   );
 };
-

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { FeaturedOrder } from '../types';
 
 interface MenuItem {
   id: string;
@@ -135,6 +136,81 @@ export const LandingPage: React.FC = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
+  // Customer Ordering Enhancements (Section 2A)
+  const [orderType, setOrderType] = useState<string>('REGULAR');
+  const [deliveryMethod, setDeliveryMethod] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [paymentPreference, setPaymentPreference] = useState<string>('PAY_ON_PICKUP');
+
+  // Featured Orders Gallery State (Section 1A)
+  const [featuredOrders, setFeaturedOrders] = useState<FeaturedOrder[]>([]);
+  const [featuredCategory, setFeaturedCategory] = useState<string>('ALL');
+  const [previewFeaturedOrder, setPreviewFeaturedOrder] = useState<FeaturedOrder | null>(null);
+
+  // Fallback completed orders if admin hasn't published custom records yet
+  const SAMPLE_FEATURED_ORDERS: FeaturedOrder[] = [
+    {
+      id: 901,
+      title: '60-Piece Classic Brownie Birthday Celebration Tower',
+      description: 'Custom fudgy brownie squares individually wrapped with red bows for a 30th birthday gathering in Lucena City.',
+      image: '/poster-classic-brownies.jpg',
+      category: 'Brownies',
+      order_type: 'Birthday Celebration',
+      order_date: '2026-11-02',
+      pieces_count: 60,
+      is_featured: true,
+      is_published: true,
+      display_order: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 902,
+      title: 'Red Velvet & Choco Chip Corporate Merienda Boxes',
+      description: 'Assorted pastry boxes packed fresh for a local school faculty day. Dense, chewy cookies made with pure creamery butter.',
+      image: '/poster-red-velvet.jpg',
+      category: 'Cookies',
+      order_type: 'Corporate Order',
+      order_date: '2026-10-28',
+      pieces_count: 72,
+      is_featured: true,
+      is_published: true,
+      display_order: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 903,
+      title: 'Artisanal Lakatan Banana Loaves with Sliced Almonds',
+      description: 'Freshly harvested Philippine Lakatan bananas baked in aluminum tins with red bows and wooden spoons for family weekend hampers.',
+      image: '/poster-banana-cake.jpg',
+      category: 'Cakes',
+      order_type: 'Custom Gift Hamper',
+      order_date: '2026-10-20',
+      pieces_count: 24,
+      is_featured: true,
+      is_published: true,
+      display_order: 3,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 904,
+      title: 'Loaded Chocolate Chip Party Trays',
+      description: 'Golden chocolate-loaded cookies baked to crisp-edged perfection for an intimate anniversary banquet in Quezon Province.',
+      image: '/poster-choco-chip.jpg',
+      category: 'Cookies',
+      order_type: 'Special Event',
+      order_date: '2026-10-15',
+      pieces_count: 90,
+      is_featured: true,
+      is_published: true,
+      display_order: 4,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ];
+
   // PWA Setup
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -160,10 +236,18 @@ export const LandingPage: React.FC = () => {
     };
   }, []);
 
-  // Fetch Approved Reviews
+  // Fetch Approved Reviews & Featured Orders
   useEffect(() => {
     api.getReviews()
       .then((data) => setReviews(data))
+      .catch(() => {});
+
+    api.getFeaturedOrders()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setFeaturedOrders(data);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -232,6 +316,21 @@ export const LandingPage: React.FC = () => {
     setTimeout(() => setOrderCopied(false), 3000);
   };
 
+  const handleOrderLikeThis = (featured: FeaturedOrder) => {
+    setOrderType(
+      featured.order_type.toUpperCase().includes('BULK')
+        ? 'BULK'
+        : featured.order_type.toUpperCase().includes('BIRTHDAY') || featured.order_type.toUpperCase().includes('EVENT')
+        ? 'SPECIAL_EVENT'
+        : 'CUSTOM'
+    );
+    setOrderNotes(`Special request inspired by Featured Order: "${featured.title}" (${featured.order_type}${featured.pieces_count ? `, approx. ${featured.pieces_count} pcs` : ''}).`);
+    const elem = document.getElementById('how-to-order');
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleSubmitInquiry = async () => {
     if (!customerName.trim()) {
       alert('Please enter your name.');
@@ -241,8 +340,12 @@ export const LandingPage: React.FC = () => {
       alert('Please enter your contact or mobile number so we can reach you.');
       return;
     }
-    if (totalCartItems === 0) {
-      alert('Your tray is empty! Please pick at least one bake from our menu above.');
+    if (deliveryMethod === 'DELIVERY' && !deliveryAddress.trim()) {
+      alert('Please enter your delivery address in Lucena City or nearby.');
+      return;
+    }
+    if (totalCartItems === 0 && !orderNotes.trim()) {
+      alert('Your tray is empty! Please pick at least one bake from our menu above or enter your customized order notes below.');
       return;
     }
 
@@ -254,6 +357,10 @@ export const LandingPage: React.FC = () => {
       const resp = await api.createInquiry({
         customer_name: customerName,
         customer_phone: customerPhone,
+        order_type: orderType,
+        delivery_method: deliveryMethod,
+        delivery_address: deliveryMethod === 'DELIVERY' ? deliveryAddress : '',
+        payment_type: paymentPreference,
         target_date: deliveryDate || null,
         items_summary: summaryText,
         items_json: itemsList,
@@ -340,6 +447,7 @@ export const LandingPage: React.FC = () => {
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-bakery-chocolate">
             <a href="#menu" className="hover:text-bakery-caramel transition-colors">Our Bakes &amp; Posters</a>
+            <a href="#featured-orders" className="hover:text-bakery-caramel transition-colors">Featured Orders</a>
             <a href="#how-to-order" className="hover:text-bakery-caramel transition-colors">How to Order</a>
             <a href="#story" className="hover:text-bakery-caramel transition-colors">Meet Dyna, Jeremy &amp; Anne</a>
             <a href="#reviews" className="hover:text-bakery-caramel transition-colors">Customer Feedback</a>
@@ -734,6 +842,127 @@ export const LandingPage: React.FC = () => {
         )}
       </section>
 
+      {/* Section: Our Featured Orders Gallery (Section 1A & 1C) */}
+      <section id="featured-orders" className="py-16 sm:py-20 bg-[#FFFDF5] border-t border-bakery-beige/80">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+          <div className="text-center space-y-3 max-w-2xl mx-auto">
+            <span className="text-[11px] font-bold tracking-widest text-bakery-caramel uppercase bg-bakery-caramel/10 px-3 py-1 rounded-full border border-bakery-caramel/20">
+              Actual Completed Bakes &bull; Lucena City
+            </span>
+            <h2 className="font-display font-bold text-3xl sm:text-4xl text-bakery-chocolate">
+              Our Featured Orders
+            </h2>
+            <p className="text-xs sm:text-sm text-bakery-muted leading-relaxed">
+              Browse real custom orders baked fresh by <strong>Dyna, Jeremy &amp; Anne</strong> — from bulk corporate pastry boxes and birthday celebrations to intimate family hampers.
+            </p>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { id: 'ALL', label: 'All Featured' },
+              { id: 'Cookies', label: 'Cookies' },
+              { id: 'Brownies', label: 'Brownies' },
+              { id: 'Cakes', label: 'Banana Cakes' },
+              { id: 'Bulk Package', label: 'Bulk & Corporate' },
+              { id: 'Special Event', label: 'Birthdays & Events' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFeaturedCategory(tab.id)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  featuredCategory === tab.id
+                    ? 'bg-bakery-chocolate text-white shadow-warm-sm'
+                    : 'bg-white border border-bakery-beige text-bakery-chocolate hover:bg-bakery-cream'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Gallery Grid */}
+          {(() => {
+            const rawList = featuredOrders.length > 0 ? featuredOrders : SAMPLE_FEATURED_ORDERS;
+            const displayList =
+              featuredCategory === 'ALL'
+                ? rawList
+                : rawList.filter(
+                    (item) =>
+                      item.category.toLowerCase().includes(featuredCategory.toLowerCase()) ||
+                      item.order_type.toLowerCase().includes(featuredCategory.toLowerCase())
+                  );
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {displayList.map((order) => {
+                  const imgSrc = order.image_url || order.image || '/poster-classic-brownies.jpg';
+                  return (
+                    <div
+                      key={order.id}
+                      className="bg-white rounded-3xl border border-bakery-beige overflow-hidden shadow-warm-sm hover:shadow-warm-lg transition-all group flex flex-col justify-between"
+                    >
+                      <div className="relative aspect-square overflow-hidden bg-bakery-cream">
+                        <img
+                          src={imgSrc}
+                          alt={order.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                          onClick={() => setPreviewFeaturedOrder(order)}
+                        />
+                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-bakery-chocolate/90 text-white backdrop-blur-xs">
+                            {order.order_type}
+                          </span>
+                          {order.pieces_count && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-bakery-caramel text-white shadow-2xs">
+                              {order.pieces_count} pcs
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setPreviewFeaturedOrder(order)}
+                          className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-xs transition-colors"
+                          title="View Full Photo"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[10px] text-bakery-muted">
+                            <span className="uppercase font-bold tracking-wider text-bakery-caramel">
+                              {order.category}
+                            </span>
+                            {order.order_date && (
+                              <span>{new Date(order.order_date).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                          <h4 className="font-display font-bold text-sm text-bakery-chocolate leading-tight">
+                            {order.title}
+                          </h4>
+                          <p className="text-[11px] text-bakery-muted leading-relaxed line-clamp-3">
+                            {order.description}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => handleOrderLikeThis(order)}
+                          className="w-full py-2 px-3 rounded-xl bg-bakery-cream hover:bg-bakery-caramel hover:text-white border border-bakery-beige text-bakery-chocolate text-xs font-bold transition-all flex items-center justify-center gap-1.5 group/btn"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5 text-bakery-caramel group-hover/btn:text-white" />
+                          <span>Order Similar to This</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      </section>
+
       {/* How to Order: Simple 3 Steps + Direct Order Slip */}
       <section id="how-to-order" className="py-16 bg-bakery-ivory border-y border-bakery-beige">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -851,6 +1080,32 @@ export const LandingPage: React.FC = () => {
               )}
 
               <div className="space-y-3 text-xs">
+                {/* Order Type Selection */}
+                <div>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Order Type</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'REGULAR', label: 'Regular Bakes' },
+                      { id: 'BULK', label: 'Bulk Order' },
+                      { id: 'CUSTOM', label: 'Custom Box' },
+                      { id: 'SPECIAL_EVENT', label: 'Birthday / Event' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setOrderType(t.id)}
+                        className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-colors ${
+                          orderType === t.id
+                            ? 'bg-bakery-chocolate text-white border-bakery-chocolate shadow-xs'
+                            : 'bg-white text-bakery-chocolate border-bakery-beige hover:bg-bakery-cream'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block font-semibold text-bakery-chocolate mb-1">Your Full Name *</label>
                   <input
@@ -886,11 +1141,79 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Delivery Method Choice */}
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">Special Notes / Requests</label>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Fulfillment Option</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod('PICKUP')}
+                      className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-colors ${
+                        deliveryMethod === 'PICKUP'
+                          ? 'bg-white border-bakery-caramel ring-1 ring-bakery-caramel text-bakery-chocolate font-bold'
+                          : 'bg-white/60 border-bakery-beige text-bakery-muted'
+                      }`}
+                    >
+                      <MapPin className="w-4 h-4 text-bakery-caramel shrink-0" />
+                      <div>
+                        <span className="block text-[11px]">Kitchen Pickup</span>
+                        <span className="block text-[9px] text-bakery-muted">Lucena City (Free)</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod('DELIVERY')}
+                      className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-colors ${
+                        deliveryMethod === 'DELIVERY'
+                          ? 'bg-white border-bakery-caramel ring-1 ring-bakery-caramel text-bakery-chocolate font-bold'
+                          : 'bg-white/60 border-bakery-beige text-bakery-muted'
+                      }`}
+                    >
+                      <Clock className="w-4 h-4 text-bakery-caramel shrink-0" />
+                      <div>
+                        <span className="block text-[11px]">Local Courier</span>
+                        <span className="block text-[9px] text-bakery-muted">Lucena &amp; nearby towns</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {deliveryMethod === 'DELIVERY' && (
+                  <div>
+                    <label className="block font-semibold text-bakery-chocolate mb-1">Delivery Address *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Barangay, Street, Landmark, Lucena City..."
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden focus:border-bakery-caramel text-xs text-bakery-chocolate"
+                    />
+                  </div>
+                )}
+
+                {/* Payment Preference */}
+                <div>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Preferred Payment Arrangement</label>
+                  <select
+                    value={paymentPreference}
+                    onChange={(e) => setPaymentPreference(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden focus:border-bakery-caramel text-xs text-bakery-chocolate"
+                  >
+                    <option value="PAY_ON_PICKUP">Cash on Kitchen Pickup / COD</option>
+                    <option value="GCASH">GCash (Send Slip after confirmation)</option>
+                    <option value="BANK_TRANSFER">Bank Transfer (BDO / BPI / Maya)</option>
+                    <option value="PARTIAL">50% Initial Deposit, Balance upon delivery</option>
+                    <option value="NEXT_WEEK">Special Payment Arrangement (Next Week)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Special Notes / Custom Requests</label>
                   <textarea
                     rows={2}
-                    placeholder="e.g. Birthday gift note, less sweet, pickup 3pm..."
+                    placeholder="e.g. Birthday gift note, less sweet, pickup 3pm, specific packaging ribbons..."
                     value={orderNotes}
                     onChange={(e) => setOrderNotes(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden focus:border-bakery-caramel text-xs text-bakery-chocolate resize-none"
@@ -1689,6 +2012,81 @@ export const LandingPage: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Featured Order Full Photo & Detail Lightbox Modal */}
+      {previewFeaturedOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewFeaturedOrder(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-bakery-beige flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="relative aspect-4/3 bg-bakery-chocolate overflow-hidden">
+              <img
+                src={previewFeaturedOrder.image_url || previewFeaturedOrder.image || '/poster-classic-brownies.jpg'}
+                alt={previewFeaturedOrder.title}
+                className="w-full h-full object-cover"
+              />
+              <button
+                onClick={() => setPreviewFeaturedOrder(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition-colors shadow-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-bakery-chocolate text-white shadow-xs">
+                  {previewFeaturedOrder.order_type}
+                </span>
+                {previewFeaturedOrder.pieces_count && (
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-bakery-caramel text-white shadow-xs">
+                    {previewFeaturedOrder.pieces_count} pcs
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="flex items-center justify-between text-xs text-bakery-muted">
+                <span className="uppercase font-bold tracking-wider text-bakery-caramel">
+                  {previewFeaturedOrder.category}
+                </span>
+                {previewFeaturedOrder.order_date && (
+                  <span>Completed on {new Date(previewFeaturedOrder.order_date).toLocaleDateString()}</span>
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-display font-bold text-2xl text-bakery-chocolate">
+                  {previewFeaturedOrder.title}
+                </h3>
+                <p className="mt-2 text-sm text-bakery-espresso/80 leading-relaxed whitespace-pre-line">
+                  {previewFeaturedOrder.description}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bakery-cream/70 border border-bakery-beige/80 text-xs text-bakery-chocolate flex items-center justify-between">
+                <span>Want Dyna, Jeremy &amp; Anne to bake this for your occasion?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = previewFeaturedOrder;
+                    setPreviewFeaturedOrder(null);
+                    handleOrderLikeThis(target);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white font-bold hover:bg-[#2c1108] transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <ShoppingBag className="w-4 h-4 text-bakery-caramel" />
+                  <span>Order Similar to This</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
