@@ -1,6 +1,9 @@
 import io
+import os
 import math
+import textwrap
 from decimal import Decimal
+from PIL import Image, ImageDraw, ImageFont
 
 from django.db import transaction
 from django.db.models import Sum, Count, Avg, Q
@@ -12,11 +15,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from .models import (
     SaleOrder, SaleItem, PaymentMethod, CustomerInquiry, InquiryStatus,
@@ -32,201 +30,285 @@ from apps.products.models import ProductVariant
 from apps.costing.models import Recipe
 from apps.production.models import ProductionOrder, ProductionStatus
 
-def generate_receipt_pdf(sale_order):
+
+def _load_receipt_font(size=14, bold=False):
+    candidates = (
+        [
+            "C:/Windows/Fonts/segoeuib.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ]
+        if bold
+        else [
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        ]
+    )
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+    return ImageFont.load_default()
+
+
+def render_receipt_png(
+    receipt_title,
+    receipt_no,
+    date_str,
+    customer_name,
+    customer_phone,
+    payment_label,
+    address_str,
+    items_rows,
+    summary_rows,
+    status_badge="PAID",
+    filename_prefix="CRAVEABLES-Receipt",
+    inline=False,
+):
+    width = 780
+    wrapped_items = []
+    for desc, qty_str, price_str, total_str in items_rows:
+        lines = textwrap.wrap(str(desc), width=36) or [str(desc)]
+        wrapped_items.append((lines, str(qty_str), str(price_str), str(total_str)))
+
+    items_height = sum(max(1, len(lines)) * 22 + 16 for lines, _, _, _ in wrapped_items)
+    summary_height = len(summary_rows) * 30 + 24
+    extra_meta_height = 26 if address_str else 0
+    height = 350 + extra_meta_height + items_height + summary_height + 95
+
+    img = Image.new("RGB", (width, height), "#FFF9DF")
+    draw = ImageDraw.Draw(img)
+
+    font_brand = _load_receipt_font(30, bold=True)
+    font_sub = _load_receipt_font(12, bold=True)
+    font_small = _load_receipt_font(12, bold=False)
+    font_body = _load_receipt_font(14, bold=False)
+    font_bold = _load_receipt_font(14, bold=True)
+    font_total = _load_receipt_font(17, bold=True)
+
+    # Outer receipt card
+    card_margin = 24
+    draw.rounded_rectangle(
+        (card_margin, card_margin, width - card_margin, height - card_margin),
+        radius=20,
+        fill="#FFFDF5",
+        outline="#E9D8B8",
+        width=2,
+    )
+
+    # Header Banner
+    header_bottom = card_margin + 115
+    draw.rounded_rectangle(
+        (card_margin, card_margin, width - card_margin, header_bottom),
+        radius=20,
+        fill="#3B170B",
+    )
+    draw.rectangle(
+        (card_margin, header_bottom - 20, width - card_margin, header_bottom),
+        fill="#3B170B",
+    )
+
+    draw.text((width // 2, card_margin + 28), "CRAVEABLES", fill="#FFF9DF", font=font_brand, anchor="mm")
+    draw.text(
+        (width // 2, card_margin + 62),
+        "MADE TO CRAVE • BAKED WITH LOVE",
+        fill="#E9D8B8",
+        font=font_sub,
+        anchor="mm",
+    )
+    draw.text(
+        (width // 2, card_margin + 88),
+        "Lucena City, Quezon • Small-Batch Artisanal Bakery",
+        fill="#C8A97E",
+        font=font_small,
+        anchor="mm",
+    )
+
+    y = header_bottom + 22
+    left_x = card_margin + 30
+    right_x = width - card_margin - 30
+
+    # Status Badge
+    badge_bg = "#15803D" if "PAID" in status_badge.upper() and "UNPAID" not in status_badge.upper() else "#B45309"
+    draw.rounded_rectangle((right_x - 150, y - 4, right_x, y + 26), radius=10, fill=badge_bg)
+    draw.text((right_x - 75, y + 11), status_badge.upper(), fill="#FFFFFF", font=font_sub, anchor="mm")
+
+    draw.text((left_x, y), f"{receipt_title}: {receipt_no}", fill="#3B170B", font=font_bold)
+    y += 26
+    draw.text((left_x, y), f"Date: {date_str}", fill="#4A3525", font=font_body)
+    y += 24
+    cust_line = f"Customer: {customer_name or 'Valued Customer'}"
+    if customer_phone:
+        cust_line += f" ({customer_phone})"
+    draw.text((left_x, y), cust_line, fill="#4A3525", font=font_body)
+    y += 24
+    draw.text((left_x, y), f"Payment / Order Info: {payment_label}", fill="#4A3525", font=font_body)
+    y += 24
+    if address_str:
+        draw.text((left_x, y), f"Address: {address_str[:65]}", fill="#4A3525", font=font_body)
+        y += 26
+
+    y += 8
+    # Table Header
+    draw.rounded_rectangle((left_x, y, right_x, y + 36), radius=8, fill="#3B170B")
+    draw.text((left_x + 14, y + 18), "ITEM DESCRIPTION", fill="#FFFFFF", font=font_sub, anchor="lm")
+    draw.text((right_x - 230, y + 18), "QTY", fill="#FFFFFF", font=font_sub, anchor="rm")
+    draw.text((right_x - 115, y + 18), "PRICE", fill="#FFFFFF", font=font_sub, anchor="rm")
+    draw.text((right_x - 14, y + 18), "TOTAL", fill="#FFFFFF", font=font_sub, anchor="rm")
+    y += 40
+
+    # Table Rows
+    for idx, (lines, qty_str, price_str, total_str) in enumerate(wrapped_items):
+        row_h = max(1, len(lines)) * 22 + 12
+        row_bg = "#FFFFFF" if idx % 2 == 0 else "#FFF9EB"
+        draw.rounded_rectangle((left_x, y, right_x, y + row_h), radius=6, fill=row_bg, outline="#EFE3C8", width=1)
+        for line_i, line_text in enumerate(lines):
+            draw.text((left_x + 14, y + 8 + line_i * 22), line_text, fill="#17110D", font=font_body)
+        draw.text((right_x - 230, y + 8), qty_str, fill="#17110D", font=font_bold, anchor="ra")
+        draw.text((right_x - 115, y + 8), price_str, fill="#4A3525", font=font_body, anchor="ra")
+        draw.text((right_x - 14, y + 8), total_str, fill="#3B170B", font=font_bold, anchor="ra")
+        y += row_h + 4
+
+    y += 10
+    # Summary Box
+    sum_box_top = y
+    sum_box_bottom = y + summary_height
+    draw.rounded_rectangle(
+        (left_x, sum_box_top, right_x, sum_box_bottom),
+        radius=12,
+        fill="#FFF9DF",
+        outline="#E9D8B8",
+        width=2,
+    )
+    sy = sum_box_top + 14
+    for s_idx, (label, val_str) in enumerate(summary_rows):
+        is_main = s_idx == len(summary_rows) - 1 or "TOTAL" in label.upper()
+        f_use = font_total if is_main else font_bold
+        color_use = "#15803D" if "DISCOUNT" in label.upper() or "SAVED" in label.upper() else "#3B170B"
+        draw.text((left_x + 18, sy), label, fill=color_use, font=f_use)
+        draw.text((right_x - 18, sy), val_str, fill=color_use, font=f_use, anchor="ra")
+        sy += 30
+
+    # Footer
+    fy = sum_box_bottom + 28
+    draw.line((left_x, fy - 12, right_x, fy - 12), fill="#E9D8B8", width=1)
+    draw.text(
+        (width // 2, fy + 6),
+        "Thank you for choosing CRAVEABLES! Baked fresh with love by Dyna, Jeremy & Anne.",
+        fill="#A97845",
+        font=font_sub,
+        anchor="mm",
+    )
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=48, leftMargin=48, topMargin=36, bottomMargin=36)
-    elements = []
-    styles = getSampleStyleSheet()
+    img.save(buffer, format="PNG", optimize=True)
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type="image/png")
+    disp_type = "inline" if inline else "attachment"
+    response["Content-Disposition"] = f'{disp_type}; filename="{filename_prefix}-{receipt_no}.png"'
+    return response
 
-    title_style = ParagraphStyle(
-        'ReceiptTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=22,
-        textColor=colors.HexColor('#3B170B'),
-        alignment=1,
-        spaceAfter=3
-    )
-    subtitle_style = ParagraphStyle(
-        'ReceiptSubtitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        textColor=colors.HexColor('#A97845'),
-        alignment=1,
-        spaceAfter=10
-    )
-    meta_style = ParagraphStyle(
-        'ReceiptMeta',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        textColor=colors.HexColor('#17110D'),
-        spaceAfter=3
-    )
 
-    elements.append(Paragraph("CRAVEABLES", title_style))
-    elements.append(Paragraph("MADE TO CRAVE • BAKED WITH LOVE", subtitle_style))
-    elements.append(Paragraph("Lucena City, Quezon • Small-Batch Artisanal Bakery", ParagraphStyle('Address', parent=styles['Normal'], fontName='Helvetica', fontSize=8, textColor=colors.HexColor('#786055'), alignment=1, spaceAfter=8)))
-    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E9D8B8'), spaceBefore=2, spaceAfter=10))
-
-    elements.append(Paragraph(f"<b>Official Sales Receipt:</b> {sale_order.receipt_number}", meta_style))
-    elements.append(Paragraph(f"<b>Date:</b> {sale_order.sale_date.strftime('%B %d, %Y')}", meta_style))
-    elements.append(Paragraph(f"<b>Customer:</b> {sale_order.customer_name or 'Valued Customer'}", meta_style))
-    elements.append(Paragraph(f"<b>Payment Method:</b> {sale_order.payment_method}", meta_style))
-    elements.append(Spacer(1, 8))
-
-    items_table_data = [['Item Description', 'Qty', 'Unit Price', 'Total']]
+def generate_receipt_pdf(sale_order, inline=False):
+    items_rows = []
     for item in sale_order.items.all():
-        items_table_data.append([
+        items_rows.append((
             item.product_variant.display_name,
             str(item.quantity),
-            f"₱{float(item.selling_price):,.2f}",
-            f"₱{float(item.total_price):,.2f}"
-        ])
+            f"PHP {float(item.selling_price):,.2f}",
+            f"PHP {float(item.total_price):,.2f}",
+        ))
+    if not items_rows:
+        items_rows.append(("Assorted Fresh Bakes", "1", f"PHP {float(sale_order.total_sales):,.2f}", f"PHP {float(sale_order.total_sales):,.2f}"))
 
-    t = Table(items_table_data, colWidths=[280, 50, 90, 96])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3B170B')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E9D8B8')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(t)
-    elements.append(Spacer(1, 10))
-
-    summary_data = [
-        ['Subtotal:', f"₱{float(sale_order.subtotal):,.2f}"],
-        ['Discount / Wholesale Savings:', f"-₱{float(sale_order.discount):,.2f}" if sale_order.discount > 0 else "₱0.00"],
-        ['Total Amount Paid:', f"₱{float(sale_order.total_sales):,.2f}"],
+    summary_rows = [
+        ("Subtotal:", f"PHP {float(sale_order.subtotal):,.2f}"),
     ]
-    t_sum = Table(summary_data, colWidths=[350, 166])
-    t_sum.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, -1), (-1, -1), colors.HexColor('#3B170B')),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#FFF9DF')),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(t_sum)
-    elements.append(Spacer(1, 20))
+    if sale_order.discount and sale_order.discount > 0:
+        summary_rows.append(("Wholesale / Promo Discount:", f"-PHP {float(sale_order.discount):,.2f}"))
+    summary_rows.append(("TOTAL AMOUNT PAID:", f"PHP {float(sale_order.total_sales):,.2f}"))
 
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E9D8B8'), spaceBefore=6, spaceAfter=8))
-    elements.append(Paragraph("Thank you for craving with us! Baked fresh with love by Dyna, Jeremy & Anne.", ParagraphStyle('Thanks', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=9, textColor=colors.HexColor('#A97845'), alignment=1)))
-
-    doc.build(elements)
-    buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="CRAVEABLES-Receipt-{sale_order.receipt_number}.pdf"'
-    return response
-
-def generate_inquiry_receipt_pdf(inquiry):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=48, leftMargin=48, topMargin=36, bottomMargin=36)
-    elements = []
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        'ReceiptTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=22,
-        textColor=colors.HexColor('#3B170B'),
-        alignment=1,
-        spaceAfter=3
-    )
-    subtitle_style = ParagraphStyle(
-        'ReceiptSubtitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        textColor=colors.HexColor('#A97845'),
-        alignment=1,
-        spaceAfter=10
-    )
-    meta_style = ParagraphStyle(
-        'ReceiptMeta',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        textColor=colors.HexColor('#17110D'),
-        spaceAfter=3
+    return render_receipt_png(
+        receipt_title="Official Sales Receipt",
+        receipt_no=sale_order.receipt_number,
+        date_str=sale_order.sale_date.strftime("%B %d, %Y") if hasattr(sale_order.sale_date, "strftime") else str(sale_order.sale_date),
+        customer_name=sale_order.customer_name or "Valued Customer",
+        customer_phone="",
+        payment_label=f"{sale_order.payment_method} (Completed Sale)",
+        address_str="",
+        items_rows=items_rows,
+        summary_rows=summary_rows,
+        status_badge="PAID",
+        filename_prefix="CRAVEABLES-Receipt",
+        inline=inline,
     )
 
-    elements.append(Paragraph("CRAVEABLES", title_style))
-    elements.append(Paragraph("MADE TO CRAVE • BAKED WITH LOVE", subtitle_style))
-    elements.append(Paragraph("Lucena City, Quezon • Small-Batch Artisanal Bakery", ParagraphStyle('Address', parent=styles['Normal'], fontName='Helvetica', fontSize=8, textColor=colors.HexColor('#786055'), alignment=1, spaceAfter=8)))
-    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E9D8B8'), spaceBefore=2, spaceAfter=10))
 
+def generate_inquiry_receipt_pdf(inquiry, inline=False):
     order_num = inquiry.shared_order_number or inquiry.inquiry_number
-    elements.append(Paragraph(f"<b>Customer Order &amp; Receipt:</b> {order_num}", meta_style))
-    elements.append(Paragraph(f"<b>Target / Fulfillment Date:</b> {inquiry.target_date.strftime('%B %d, %Y') if inquiry.target_date else 'Immediate'}", meta_style))
-    elements.append(Paragraph(f"<b>Customer:</b> {inquiry.customer_name} ({inquiry.customer_phone})", meta_style))
-    if inquiry.delivery_address:
-        elements.append(Paragraph(f"<b>Delivery Address:</b> {inquiry.delivery_address}", meta_style))
-    elements.append(Spacer(1, 8))
-
-    items_table_data = [['Item Description', 'Qty', 'Price', 'Total']]
+    items_rows = []
+    reg_subtotal = 0.0
+    total_saved = 0.0
     if inquiry.items_json:
         for itm in inquiry.items_json:
-            qty = int(itm.get('qty', 1))
-            prc = float(itm.get('price', 0))
-            items_table_data.append([
-                itm.get('name', 'Bake Item'),
+            qty = int(itm.get("qty", 1))
+            prc = float(itm.get("price", 0))
+            reg_p = float(itm.get("regular_price", prc))
+            disc = float(itm.get("discount", 0))
+            reg_subtotal += reg_p * qty
+            total_saved += disc
+            name_str = itm.get("name", "Bake Item")
+            if itm.get("tier"):
+                name_str += f" ({itm.get('tier')})"
+            items_rows.append((
+                name_str,
                 str(qty),
-                f"₱{prc:,.2f}",
-                f"₱{(qty * prc):,.2f}"
-            ])
+                f"PHP {prc:,.2f}",
+                f"PHP {(qty * prc):,.2f}",
+            ))
     else:
-        items_table_data.append([inquiry.items_summary or 'Assorted Bakes', '1', f"₱{float(inquiry.estimated_total):,.2f}", f"₱{float(inquiry.estimated_total):,.2f}"])
+        est = float(inquiry.estimated_total or 0)
+        reg_subtotal = est
+        items_rows.append((
+            inquiry.items_summary or "Assorted Bakes",
+            "1",
+            f"PHP {est:,.2f}",
+            f"PHP {est:,.2f}",
+        ))
 
-    t = Table(items_table_data, colWidths=[280, 50, 90, 96])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3B170B')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E9D8B8')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(t)
-    elements.append(Spacer(1, 10))
+    summary_rows = []
+    if total_saved > 0:
+        summary_rows.append(("Regular Retail Subtotal:", f"PHP {reg_subtotal:,.2f}"))
+        summary_rows.append(("Wholesale Reseller Discount:", f"-PHP {total_saved:,.2f}"))
+    summary_rows.append(("Order Total:", f"PHP {float(inquiry.estimated_total or 0):,.2f}"))
+    summary_rows.append(("Amount Paid / Deposit:", f"PHP {float(inquiry.amount_paid or 0):,.2f}"))
+    summary_rows.append(("Remaining Balance Due:", f"PHP {float(inquiry.remaining_balance or 0):,.2f}"))
 
-    summary_data = [
-        ['Order Total:', f"₱{float(inquiry.estimated_total):,.2f}"],
-        ['Amount Paid / Deposit:', f"₱{float(inquiry.amount_paid or 0):,.2f}"],
-        ['Remaining Balance Due:', f"₱{float(inquiry.remaining_balance or 0):,.2f}"],
-        ['Payment Status:', inquiry.payment_status],
-    ]
-    t_sum = Table(summary_data, colWidths=[350, 166])
-    t_sum.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, -1), (-1, -1), colors.HexColor('#3B170B')),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFF9DF')),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(t_sum)
-    elements.append(Spacer(1, 20))
+    date_str = (
+        inquiry.target_date.strftime("%B %d, %Y")
+        if hasattr(inquiry.target_date, "strftime") and inquiry.target_date
+        else (str(inquiry.target_date) if inquiry.target_date else "Immediate")
+    )
 
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E9D8B8'), spaceBefore=6, spaceAfter=8))
-    elements.append(Paragraph("Thank you for choosing CRAVEABLES! Baked fresh with love by Dyna, Jeremy & Anne.", ParagraphStyle('Thanks', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=9, textColor=colors.HexColor('#A97845'), alignment=1)))
-
-    doc.build(elements)
-    buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="CRAVEABLES-Order-{order_num}.pdf"'
-    return response
+    return render_receipt_png(
+        receipt_title="Whole Sales Receipt" if inquiry.order_type == "WHOLESALE" else "Customer Order Receipt",
+        receipt_no=order_num,
+        date_str=date_str,
+        customer_name=inquiry.customer_name,
+        customer_phone=inquiry.customer_phone,
+        payment_label=f"{inquiry.order_type} • {inquiry.delivery_method} • {inquiry.payment_status}",
+        address_str=inquiry.delivery_address or "",
+        items_rows=items_rows,
+        summary_rows=summary_rows,
+        status_badge=str(inquiry.payment_status or "UNPAID"),
+        filename_prefix="CRAVEABLES-Receipt",
+        inline=inline,
+    )
 
 class SaleOrderViewSet(viewsets.ModelViewSet):
     queryset = SaleOrder.objects.all().prefetch_related(
@@ -380,7 +462,14 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='receipt-pdf')
     def download_receipt(self, request, pk=None):
         order = self.get_object()
-        return generate_receipt_pdf(order)
+        inline = request.query_params.get('inline') == '1'
+        return generate_receipt_pdf(order, inline=inline)
+
+    @action(detail=True, methods=['get'], url_path='receipt-image')
+    def download_receipt_image(self, request, pk=None):
+        order = self.get_object()
+        inline = request.query_params.get('inline') == '1'
+        return generate_receipt_pdf(order, inline=inline)
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -822,7 +911,14 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='receipt-pdf')
     def download_receipt(self, request, pk=None):
         inquiry = self.get_object()
-        return generate_inquiry_receipt_pdf(inquiry)
+        inline = request.query_params.get('inline') == '1'
+        return generate_inquiry_receipt_pdf(inquiry, inline=inline)
+
+    @action(detail=True, methods=['get'], url_path='receipt-image')
+    def download_receipt_image(self, request, pk=None):
+        inquiry = self.get_object()
+        inline = request.query_params.get('inline') == '1'
+        return generate_inquiry_receipt_pdf(inquiry, inline=inline)
 
 
 class CustomerReviewViewSet(viewsets.ModelViewSet):

@@ -162,6 +162,47 @@ def profit_loss_report(request):
     total_operating_expenses = sum(item['total'] for item in exp_by_category) or Decimal('0.00')
     net_income = gross_profit - total_operating_expenses
 
+    sales_records = []
+    for s in sales_qs.prefetch_related('items__product_variant__product').order_by('-sale_date', '-id'):
+        items_str = ', '.join(f"{it.quantity}x {it.product_variant.display_name}" for it in s.items.all()) or 'Assorted Bakes'
+        sales_records.append({
+            'id': s.id,
+            'receipt_number': s.receipt_number,
+            'sale_date': str(s.sale_date),
+            'customer_name': s.customer_name or 'Walk-in',
+            'items_summary': items_str,
+            'payment_method': s.payment_method,
+            'subtotal': float(s.subtotal),
+            'discount': float(s.discount),
+            'total_sales': float(s.total_sales),
+            'total_cogs': float(s.total_cogs),
+            'gross_profit': float(s.gross_profit),
+        })
+
+    expense_records = []
+    for exp in exp_qs.order_by('-date', '-id'):
+        expense_records.append({
+            'id': exp.id,
+            'date': str(exp.date),
+            'category': exp.category,
+            'description': exp.description,
+            'payment_method': exp.payment_method,
+            'amount': float(exp.amount),
+        })
+
+    product_costing = []
+    for r in Recipe.objects.all().select_related('product_variant', 'product_variant__product'):
+        product_costing.append({
+            'product': r.product_variant.product.name,
+            'variant': r.product_variant.name,
+            'batch_yield': r.batch_yield,
+            'total_batch_cost': float(r.total_batch_cost),
+            'cost_per_unit': float(r.calculated_cost_per_unit),
+            'selling_price': float(r.selling_price),
+            'profit_per_unit': float(r.profit_per_unit),
+            'margin_pct': float(r.profit_margin_percentage),
+        })
+
     return Response({
         'gross_sales': float(gross_sales),
         'discounts': float(discounts),
@@ -175,10 +216,14 @@ def profit_loss_report(request):
         'total_operating_expenses': float(total_operating_expenses),
         'net_income': float(net_income),
         'net_margin_percentage': round(float((net_income / net_sales) * 100), 2) if net_sales > 0 else 0.0,
+        'sales_records': sales_records,
+        'expense_records': expense_records,
+        'product_costing': product_costing,
     })
 
 @api_view(['GET'])
 def export_excel_report(request):
+    sync_all_inquiries_to_sales()
     wb = openpyxl.Workbook()
     # Remove default sheet
     wb.remove(wb.active)

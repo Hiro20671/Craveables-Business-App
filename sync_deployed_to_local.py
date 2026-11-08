@@ -16,7 +16,10 @@ from apps.inventory.models import Ingredient, StockTransaction
 from apps.products.models import Category, Product, ProductVariant
 from apps.costing.models import PackagingItem, Recipe, RecipeIngredient, RecipePackaging
 from apps.production.models import ProductionOrder, ProductionIngredientUsage, ProductionStatus
-from apps.sales.models import SaleOrder, SaleItem, CustomerInquiry, InquiryStatus, CustomerReview, PaymentMethod
+from apps.sales.models import (
+    SaleOrder, SaleItem, CustomerInquiry, InquiryStatus,
+    CustomerReview, PaymentMethod, Customer, CustomerPayment, parse_date_safe
+)
 from apps.expenses.models import Expense
 from apps.settings_app.models import BusinessSettings
 
@@ -294,25 +297,62 @@ def sync_data():
             )
         print(f"Synced {len(sales_orders_data)} sales orders.")
 
+    # 7b. Sync Customers
+    print("Fetching customers...")
+    customers_data = fetch_json('sales/customers/')
+    if customers_data:
+        for cust in customers_data:
+            Customer.objects.update_or_create(
+                id=cust['id'],
+                defaults={
+                    'name': cust.get('name', ''),
+                    'phone': cust.get('phone', ''),
+                    'email': cust.get('email', ''),
+                    'address': cust.get('address', ''),
+                    'notes': cust.get('notes', ''),
+                }
+            )
+        print(f"Synced {len(customers_data)} customers.")
+
     # 8. Sync Customer Inquiries (The Real Live Orders!)
     print("Fetching customer inquiries (real customer orders)...")
     inquiries_data = fetch_json('sales/inquiries/')
     if inquiries_data:
+        remote_ids = [inq['id'] for inq in inquiries_data]
+        # Delete any local inquiries that were deleted on the deployed system
+        deleted_count, _ = CustomerInquiry.objects.exclude(id__in=remote_ids).delete()
+        if deleted_count:
+            print(f"  -> Removed {deleted_count} local inquiry records that were deleted on deployed server.")
         for inq in inquiries_data:
             conv_sale_id = inq.get('converted_sale')
             conv_sale = SaleOrder.objects.filter(id=conv_sale_id).first() if conv_sale_id else None
+            cust_id = inq.get('customer')
+            cust_obj = Customer.objects.filter(id=cust_id).first() if cust_id else None
             inq_obj, created = CustomerInquiry.objects.update_or_create(
                 id=inq['id'],
                 defaults={
                     'inquiry_number': inq['inquiry_number'],
+                    'shared_order_number': inq.get('shared_order_number', inq['inquiry_number']),
+                    'customer': cust_obj,
                     'customer_name': inq.get('customer_name', ''),
                     'customer_phone': inq.get('customer_phone', ''),
-                    'target_date': inq.get('target_date'),
+                    'order_type': inq.get('order_type', 'REGULAR'),
+                    'delivery_method': inq.get('delivery_method', 'PICKUP'),
+                    'delivery_address': inq.get('delivery_address', ''),
+                    'special_instructions': inq.get('special_instructions', ''),
+                    'target_date': parse_date_safe(inq.get('target_date')),
                     'items_summary': inq.get('items_summary', ''),
                     'items_json': inq.get('items_json', []),
                     'estimated_total': Decimal(str(inq.get('estimated_total', 0))),
                     'notes': inq.get('notes', ''),
                     'status': inq.get('status', InquiryStatus.PENDING),
+                    'payment_type': inq.get('payment_type', 'PAY_ON_PICKUP'),
+                    'initial_deposit': Decimal(str(inq.get('initial_deposit', 0))),
+                    'amount_paid': Decimal(str(inq.get('amount_paid', 0))),
+                    'remaining_balance': Decimal(str(inq.get('remaining_balance', 0))),
+                    'payment_due_date': parse_date_safe(inq.get('payment_due_date')),
+                    'payment_status': inq.get('payment_status', 'UNPAID'),
+                    'payment_notes': inq.get('payment_notes', ''),
                     'converted_sale': conv_sale,
                 }
             )
@@ -374,13 +414,11 @@ def sync_data():
     print(f"Total Production Orders: {ProductionOrder.objects.count()}")
     print(f"Total Ingredients: {Ingredient.objects.count()}")
 
-    # Dump the database backup to live_data.json and database_backup.json
-    print("\nExporting full database dump to live_data.json and database_backup.json...")
+    # Dump the database backup to live_data.json
+    print("\nExporting full database dump to live_data.json...")
     from django.core.management import call_command
     with open('live_data.json', 'w', encoding='utf-8') as f:
-        call_command('dumpdata', '--natural-foreign', '--natural-primary', '-e', 'contenttypes', '-e', 'auth.Permission', '--indent', '2', stdout=f)
-    with open('database_backup.json', 'w', encoding='utf-8') as f:
-        call_command('dumpdata', '--natural-foreign', '--natural-primary', '-e', 'contenttypes', '-e', 'auth.Permission', '--indent', '2', stdout=f)
+        call_command('dumpdata', '--natural-foreign', '--natural-primary', '-e', 'contenttypes', '-e', 'auth.Permission', '-e', 'admin.logentry', '-e', 'sessions.session', '--indent', '2', stdout=f)
     print("Database export complete!")
 
 if __name__ == '__main__':

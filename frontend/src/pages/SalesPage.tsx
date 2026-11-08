@@ -22,7 +22,9 @@ import {
   XCircle,
   Clock,
   ArrowRight,
-  FileText
+  FileText,
+  Image as ImageIcon,
+  Download
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../services/api';
@@ -463,16 +465,15 @@ export const SalesPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <a
-                              href={api.getSaleReceiptPdfUrl(s.id)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
-                              title="Download Official PDF Receipt"
-                              className="p-1.5 rounded-lg hover:bg-bakery-cream text-bakery-chocolate border border-bakery-beige flex items-center justify-center"
+                            <button
+                              type="button"
+                              onClick={() => setViewReceipt(s)}
+                              title="Preview & Download Official Receipt Image (.png)"
+                              className="px-2 py-1 rounded-lg bg-bakery-cream hover:bg-bakery-beige text-bakery-chocolate border border-bakery-beige flex items-center justify-center gap-1 text-[10px] font-bold"
                             >
-                              <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
-                            </a>
+                              <ImageIcon className="w-3.5 h-3.5 text-bakery-chocolate" />
+                              <span>Receipt Image</span>
+                            </button>
 
                             <button
                               onClick={() => setViewReceipt(s)}
@@ -809,92 +810,66 @@ export const SalesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Official Receipt Dialog */}
+      {/* Official Receipt Image Preview & Download Dialog */}
       {viewReceipt && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm bg-white rounded-2xl border border-bakery-beige p-6 shadow-2xl animate-in fade-in zoom-in-95 text-xs text-bakery-espresso">
-            {/* Bakery Brand Header */}
-            <div className="text-center pb-4 border-b border-dashed border-bakery-beige">
-              <img src="/logo.png" alt="CRAVEABLES" className="w-12 h-12 mx-auto rounded-full mb-1" />
-              <h3 className="font-display font-bold text-lg text-bakery-chocolate tracking-wide">
-                CRAVEABLES
-              </h3>
-              <p className="text-[10px] text-bakery-muted uppercase">Artisanal Bakery &bull; Official Receipt</p>
-              <p className="text-[11px] font-bold text-bakery-chocolate mt-2">
-                Receipt #: {viewReceipt.receipt_number}
-              </p>
-              <p className="text-[10px] text-bakery-muted">{viewReceipt.sale_date}</p>
-            </div>
-
-            {/* Receipt Items */}
-            <div className="py-4 space-y-2 border-b border-dashed border-bakery-beige">
-              {viewReceipt.items?.map((it, idx) => (
-                <div key={idx} className="flex justify-between">
-                  <div className="pr-2">
-                    <p className="font-semibold text-bakery-chocolate">{it.display_name}</p>
-                    <p className="text-[10px] text-bakery-muted">
-                      {it.quantity} x ₱{Number(it.selling_price).toFixed(2)}
-                    </p>
-                  </div>
-                  <span className="font-bold text-bakery-chocolate">
-                    ₱{Number(it.total_price).toFixed(2)}
-                  </span>
+        <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-bakery-ivory rounded-3xl border border-bakery-beige overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 text-xs text-bakery-espresso flex flex-col max-h-[92vh]">
+            <div className="p-4 bg-bakery-chocolate text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-bakery-caramel" />
+                <div>
+                  <h3 className="font-display font-bold text-sm">
+                    Official Sales Receipt Image (.png)
+                  </h3>
+                  <p className="text-[11px] text-bakery-beige/80">
+                    Receipt #{viewReceipt.receipt_number} &bull; {viewReceipt.customer_name || 'Walk-in'}
+                  </p>
                 </div>
-              ))}
-            </div>
-
-            {/* Receipt Totals */}
-            <div className="py-3 space-y-1 text-xs">
-              <div className="flex justify-between text-bakery-muted">
-                <span>Subtotal:</span>
-                <span>₱{Number(viewReceipt.subtotal).toFixed(2)}</span>
               </div>
-              {Number(viewReceipt.discount) > 0 && (
-                <div className="flex justify-between text-status-orange">
-                  <span>Discount:</span>
-                  <span>-₱{Number(viewReceipt.discount).toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-display font-bold text-sm text-bakery-chocolate pt-1 border-t border-bakery-beige">
-                <span>Total Amount:</span>
-                <span>₱{Number(viewReceipt.total_sales).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-[11px] text-bakery-muted pt-1">
-                <span>Payment Method:</span>
-                <span className="font-bold">{viewReceipt.payment_method}</span>
-              </div>
-            </div>
-
-            <div className="text-center pt-3 border-t border-dashed border-bakery-beige text-[10px] text-bakery-muted">
-              Thank you for craving with us! 🤎
-            </div>
-
-            <div className="pt-4 flex items-center gap-2">
-              <a
-                href={api.getSaleReceiptPdfUrl(viewReceipt.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="flex-1 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige flex items-center justify-center gap-1.5"
-              >
-                <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
-                <span>Download PDF</span>
-              </a>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-3 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige flex items-center justify-center gap-1"
-                title="Print Receipt"
-              >
-                <Printer className="w-3.5 h-3.5 text-bakery-chocolate" />
-              </button>
               <button
                 type="button"
                 onClick={() => setViewReceipt(null)}
-                className="flex-1 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-semibold hover:bg-[#2c1108]"
+                className="text-bakery-cream/80 hover:text-white font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 bg-bakery-cream/40 flex flex-col items-center">
+              <img
+                src={api.getSaleReceiptPdfUrl(viewReceipt.id, true)}
+                alt={`Receipt ${viewReceipt.receipt_number}`}
+                className="w-full h-auto rounded-2xl shadow-md border border-bakery-beige bg-white"
+              />
+            </div>
+
+            <div className="p-4 bg-white border-t border-bakery-beige flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setViewReceipt(null)}
+                className="px-4 py-2 rounded-xl border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-cream"
               >
                 Close
               </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige flex items-center justify-center gap-1.5"
+                  title="Print Receipt"
+                >
+                  <Printer className="w-3.5 h-3.5 text-bakery-chocolate" />
+                  <span>Print</span>
+                </button>
+                <a
+                  href={api.getSaleReceiptPdfUrl(viewReceipt.id, false)}
+                  download={`CRAVEABLES-Receipt-${viewReceipt.receipt_number}.png`}
+                  className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] flex items-center justify-center gap-1.5 shadow-warm-xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-bakery-caramel" />
+                  <span>Download Receipt Image (.png)</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>

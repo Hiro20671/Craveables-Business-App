@@ -121,8 +121,9 @@ export const OrdersPage: React.FC = () => {
   const [convertPaymentMethod, setConvertPaymentMethod] = useState<'GCash' | 'Cash' | 'Bank Transfer'>('GCash');
   const [convertingLoading, setConvertingLoading] = useState(false);
 
-  // Kitchen Slip / Print Modal
+  // Kitchen Slip / Print Modal & Receipt Image Preview Modal
   const [slipInquiry, setSlipInquiry] = useState<CustomerInquiry | null>(null);
+  const [receiptPreviewInquiry, setReceiptPreviewInquiry] = useState<CustomerInquiry | null>(null);
 
   // Create Manual Pre-Order Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1304,17 +1305,15 @@ export const OrdersPage: React.FC = () => {
                           </button>
                         )}
 
-                        <a
-                          href={api.getInquiryReceiptPdfUrl(inq.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
+                        <button
+                          type="button"
+                          onClick={() => setReceiptPreviewInquiry(inq)}
                           className="px-2.5 py-1.5 rounded-xl bg-bakery-cream hover:bg-bakery-beige border border-bakery-beige text-bakery-chocolate text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
-                          title="Download Official PDF Receipt for Customer"
+                          title="Preview & Download Official Receipt Image (.png)"
                         >
-                          <FileText className="w-3.5 h-3.5 text-bakery-chocolate" />
-                          <span>PDF Receipt</span>
-                        </a>
+                          <ImageIcon className="w-3.5 h-3.5 text-bakery-chocolate" />
+                          <span>Receipt Image</span>
+                        </button>
 
                         <button
                           type="button"
@@ -1422,16 +1421,14 @@ export const OrdersPage: React.FC = () => {
                                   Record Sale
                                 </button>
                               )}
-                              <a
-                                href={api.getInquiryReceiptPdfUrl(inq.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
+                              <button
+                                type="button"
+                                onClick={() => setReceiptPreviewInquiry(inq)}
                                 className="p-1 rounded bg-bakery-cream border border-bakery-beige hover:bg-bakery-beige text-bakery-chocolate"
-                                title="Download Official PDF Receipt"
+                                title="Preview & Download Official Receipt Image (.png)"
                               >
-                                <FileText className="w-3.5 h-3.5" />
-                              </a>
+                                <ImageIcon className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => handleSendToProduction(inq)}
                                 className="p-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100"
@@ -2522,6 +2519,14 @@ export const OrdersPage: React.FC = () => {
               >
                 Close
               </button>
+              <a
+                href={api.getInquiryReceiptPdfUrl(slipInquiry.id, false)}
+                download={`CRAVEABLES-Receipt-${slipInquiry.shared_order_number || slipInquiry.inquiry_number}.png`}
+                className="px-4 py-2 rounded-xl bg-bakery-cream border border-bakery-beige text-bakery-chocolate text-xs font-bold hover:bg-bakery-beige flex items-center gap-1.5"
+              >
+                <ImageIcon className="w-4 h-4 text-bakery-caramel" />
+                <span>Download Receipt Image (.png)</span>
+              </a>
               <button
                 onClick={() => window.print()}
                 className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] flex items-center gap-1.5"
@@ -2529,6 +2534,59 @@ export const OrdersPage: React.FC = () => {
                 <Printer className="w-4 h-4 text-bakery-caramel" />
                 <span>Print Kitchen Slip</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Official Receipt Image Preview & Download */}
+      {receiptPreviewInquiry && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-bakery-ivory w-full max-w-lg rounded-3xl border border-bakery-beige shadow-warm-lg overflow-hidden flex flex-col max-h-[92vh] animate-fade-in">
+            <div className="p-4 bg-bakery-chocolate text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-bakery-caramel" />
+                <div>
+                  <h3 className="font-display font-bold text-sm">
+                    Official Customer Receipt Image (.png)
+                  </h3>
+                  <p className="text-[11px] text-bakery-beige/80">
+                    {receiptPreviewInquiry.shared_order_number || receiptPreviewInquiry.inquiry_number} &bull; {receiptPreviewInquiry.customer_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReceiptPreviewInquiry(null)}
+                className="text-bakery-cream/80 hover:text-white font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 bg-bakery-cream/40 flex flex-col items-center">
+              <img
+                src={api.getInquiryReceiptPdfUrl(receiptPreviewInquiry.id, true)}
+                alt={`Receipt ${receiptPreviewInquiry.inquiry_number}`}
+                className="w-full h-auto rounded-2xl shadow-md border border-bakery-beige bg-white"
+              />
+            </div>
+
+            <div className="p-4 bg-white border-t border-bakery-beige flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setReceiptPreviewInquiry(null)}
+                className="px-4 py-2 rounded-xl border border-bakery-beige text-xs font-semibold text-bakery-chocolate hover:bg-bakery-cream"
+              >
+                Close Preview
+              </button>
+              <a
+                href={api.getInquiryReceiptPdfUrl(receiptPreviewInquiry.id, false)}
+                download={`CRAVEABLES-Receipt-${receiptPreviewInquiry.shared_order_number || receiptPreviewInquiry.inquiry_number}.png`}
+                className="px-5 py-2.5 rounded-xl bg-bakery-chocolate hover:bg-[#2c1108] text-white text-xs font-bold flex items-center gap-2 shadow-warm-xs transition-colors"
+              >
+                <ImageIcon className="w-4 h-4 text-bakery-caramel" />
+                <span>Download Receipt Image (.png)</span>
+              </a>
             </div>
           </div>
         </div>

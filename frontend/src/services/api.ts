@@ -59,8 +59,14 @@ export const api = {
     const q = new URLSearchParams(params as any).toString();
     return request<any>(`/reports/profit-loss/${q ? `?${q}` : ''}`);
   },
-  downloadExcelReportUrl: () => `${API_BASE}/reports/export/excel/`,
-  downloadPdfReportUrl: () => `${API_BASE}/reports/export/pdf/`,
+  downloadExcelReportUrl: (params?: { start_date?: string; end_date?: string }) => {
+    const q = params ? new URLSearchParams(params as any).toString() : '';
+    return `${API_BASE}/reports/export/excel/${q ? `?${q}` : ''}`;
+  },
+  downloadPdfReportUrl: (params?: { start_date?: string; end_date?: string }) => {
+    const q = params ? new URLSearchParams(params as any).toString() : '';
+    return `${API_BASE}/reports/export/pdf/${q ? `?${q}` : ''}`;
+  },
 
   // Inventory & Ingredients
   getIngredients: () => request<any[]>('/inventory/ingredients/'),
@@ -190,11 +196,13 @@ export const api = {
   deleteSaleOrder: (id: number) => request<void>(`/sales/orders/${id}/`, { method: 'DELETE' }),
   cancelSaleOrder: (id: number) => request<any>(`/sales/orders/${id}/cancel/`, { method: 'POST' }),
   getSalesSummary: () => request<any>('/sales/orders/summary/'),
-  getSaleReceiptPdfUrl: (id: number) => `${API_BASE}/sales/orders/${id}/receipt-pdf/`,
+  getSaleReceiptPdfUrl: (id: number, inline = false) =>
+    `${API_BASE}/sales/orders/${id}/receipt-image/${inline ? '?inline=1' : ''}`,
 
   // Customer Inquiries & Pre-Orders
   getInquiries: () => request<any[]>('/sales/inquiries/'),
-  getInquiryReceiptPdfUrl: (id: number) => `${API_BASE}/sales/inquiries/${id}/receipt-pdf/`,
+  getInquiryReceiptPdfUrl: (id: number, inline = false) =>
+    `${API_BASE}/sales/inquiries/${id}/receipt-image/${inline ? '?inline=1' : ''}`,
   createInquiry: (data: any) => request<any>('/sales/inquiries/', { method: 'POST', body: JSON.stringify(data) }),
   updateInquiry: (id: number, data: any) =>
     request<any>(`/sales/inquiries/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
