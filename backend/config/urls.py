@@ -1,10 +1,3 @@
-from django.contrib import admin
-from django.urls import path, include, re_path
-from django.conf import settings
-from django.conf.urls.static import static
-from django.http import HttpResponse, FileResponse
-from pathlib import Path
-
 import mimetypes
 from pathlib import Path
 from django.contrib import admin
@@ -13,23 +6,41 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse, FileResponse, Http404
 
+
 def serve_spa(request, resource=""):
     frontend_dist = (settings.BASE_DIR.parent / 'frontend' / 'dist').resolve()
     static_root = Path(settings.STATIC_ROOT).resolve() if settings.STATIC_ROOT else frontend_dist
-    
+
     # If a specific static resource is requested (e.g. assets/..., poster-*.jpg, favicon.png)
     if resource:
         clean_resource = resource.lstrip('/')
         file_path = (frontend_dist / clean_resource).resolve()
-        if not file_path.is_file() and (static_root / clean_resource).is_file():
-            file_path = (static_root / clean_resource).resolve()
-        
-        # Verify file is within frontend_dist or static_root
+        if (not file_path.is_file() or file_path.stat().st_size == 0) and (static_root / clean_resource).is_file():
+            candidate = (static_root / clean_resource).resolve()
+            if candidate.stat().st_size > 0:
+                file_path = candidate
+
+        # If a browser requests an older or mismatched hashed bundle (e.g. assets/index-XYZ.js),
+        # automatically resolve to the current bundle in frontend/dist/assets/ so the SPA never white-screens.
+        if not file_path.is_file() or file_path.stat().st_size == 0:
+            assets_dir = frontend_dist / 'assets'
+            if clean_resource.startswith('assets/index-') and clean_resource.endswith('.js') and assets_dir.is_dir():
+                js_files = sorted(assets_dir.glob('index-*.js'), key=lambda p: p.stat().st_mtime, reverse=True)
+                for candidate in js_files:
+                    if candidate.stat().st_size > 0:
+                        file_path = candidate
+                        break
+            elif clean_resource.startswith('assets/index-') and clean_resource.endswith('.css') and assets_dir.is_dir():
+                css_files = sorted(assets_dir.glob('index-*.css'), key=lambda p: p.stat().st_mtime, reverse=True)
+                for candidate in css_files:
+                    if candidate.stat().st_size > 0:
+                        file_path = candidate
+                        break
+
         try:
-            if file_path.is_file():
+            if file_path.is_file() and file_path.stat().st_size > 0:
                 content_type, encoding = mimetypes.guess_type(str(file_path))
-                
-                # Explicit fallback content types
+
                 if file_path.suffix == '.js':
                     content_type = 'application/javascript'
                 elif file_path.suffix == '.css':
@@ -42,12 +53,11 @@ def serve_spa(request, resource=""):
                     content_type = 'image/png'
                 elif file_path.suffix == '.svg':
                     content_type = 'image/svg+xml'
-                
+
                 response = FileResponse(open(file_path, 'rb'), content_type=content_type or 'application/octet-stream')
                 if encoding:
                     response['Content-Encoding'] = encoding
-                
-                # Never cache service worker or manifest
+
                 if clean_resource in ['sw.js', 'service-worker.js', 'manifest.json']:
                     response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
                     response['Pragma'] = 'no-cache'
@@ -58,15 +68,16 @@ def serve_spa(request, resource=""):
         except Exception:
             pass
 
+        # Never return text/html for missing static assets (.js, .css, images)
+        if Path(clean_resource).suffix.lower() in ['.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.json', '.woff', '.woff2', '.map']:
+            raise Http404(f"Static resource not found: {clean_resource}")
+
     # Fallback to index.html for client-side routing (e.g. /, /login, /dashboard)
     index_file = frontend_dist / 'index.html'
-    if not index_file.is_file() and (static_root / 'index.html').is_file():
-        index_file = static_root / 'index.html'
-
-    if index_file.is_file():
+    if index_file.is_file() and index_file.stat().st_size > 0:
         try:
             content = index_file.read_text(encoding='utf-8')
-            if 'index-Cfx6btse.js' in content:
+            if '<div id="root"></div>' in content:
                 response = HttpResponse(content, content_type='text/html')
                 response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
                 response['Pragma'] = 'no-cache'
@@ -98,34 +109,7 @@ def serve_spa(request, resource=""):
     response['Pragma'] = 'no-cache'
     response['Expires'] = '0'
     return response
-        
-    return HttpResponse("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>CRAVEABLES API Server</title>
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #FFF9DF; color: #3B170B; margin: 0; padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; }
-                .card { background: #FFFDF5; border: 1px solid #E9D8B8; border-radius: 20px; padding: 32px; max-width: 520px; text-align: center; box-shadow: 0 4px 20px rgba(59,23,11,0.08); }
-                h1 { margin-top: 0; font-size: 26px; }
-                p { color: #5a4b41; font-size: 14px; line-height: 1.6; }
-                a { display: inline-block; margin: 8px; padding: 10px 18px; border-radius: 12px; background: #3B170B; color: #fff; text-decoration: none; font-weight: bold; font-size: 13px; }
-                a.secondary { background: #A97845; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h1>CRAVEABLES Business Management System</h1>
-                <p>Django REST Framework Backend is running live & ready to serve requests.</p>
-                <div style="margin-top: 20px;">
-                    <a href="/admin/">Django Admin Portal</a>
-                    <a href="/api/settings/" class="secondary">Settings API Endpoint</a>
-                </div>
-            </div>
-        </body>
-        </html>
-    """)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),

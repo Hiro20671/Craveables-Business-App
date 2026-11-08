@@ -125,10 +125,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 _frontend_dist = BASE_DIR.parent / 'frontend' / 'dist'
 if _frontend_dist.exists():
-    STATICFILES_DIRS = [_frontend_dist]
     WHITENOISE_ROOT = _frontend_dist
-
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+WHITENOISE_AUTOREFRESH = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

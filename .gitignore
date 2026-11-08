@@ -28,8 +28,15 @@ frontend/node_modules/
 .env.local
 *.env
 
-# Local Databases (Data is safely backed up in database_backup.json and backend/craveables_backup.json)
+# Local Databases & Duplicate Static Copies
 *.sqlite3-journal
+backend/staticfiles/
+database_backup.json
+backend/craveables_backup.json
+Craveables Bakery Emblem.png
+Craveables Bakery Love Badge.png
+CRAVEABLES_OFFICIAL_LOGO.jpg
+*.xlsx
 
 # IDE & OS
 .vscode/
