@@ -234,6 +234,17 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     serializer_class = SaleOrderSerializer
 
     def get_queryset(self):
+        # Auto-convert any completed customer inquiries into official sale orders
+        completed_inquiries = CustomerInquiry.objects.filter(
+            status=InquiryStatus.COMPLETED,
+            converted_sale__isnull=True
+        )
+        for inq in completed_inquiries:
+            try:
+                inq.auto_create_sale_order()
+            except Exception:
+                pass
+
         qs = super().get_queryset()
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
@@ -352,6 +363,17 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary_metrics(self, request):
+        # Auto-convert any completed customer inquiries first
+        completed_inquiries = CustomerInquiry.objects.filter(
+            status=InquiryStatus.COMPLETED,
+            converted_sale__isnull=True
+        )
+        for inq in completed_inquiries:
+            try:
+                inq.auto_create_sale_order()
+            except Exception:
+                pass
+
         qs = self.get_queryset()
         totals = qs.aggregate(
             total_sales=Sum('total_sales'),
@@ -652,6 +674,10 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         inquiry.amount_paid = (inquiry.amount_paid or Decimal('0.00')) + amount
         inquiry.save()
 
+        # If order is completed or fully paid, automatically create/link official SaleOrder!
+        if (inquiry.status == InquiryStatus.COMPLETED or inquiry.remaining_balance <= 0) and not inquiry.converted_sale_id:
+            inquiry.auto_create_sale_order()
+
         # Update linked sale notes if present
         if inquiry.converted_sale:
             sale = inquiry.converted_sale
@@ -754,26 +780,10 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             })
 
         payment_method = request.data.get('payment_method', PaymentMethod.GCASH)
-        notes = f"Converted from Customer Order {inquiry.inquiry_number}. {inquiry.notes}".strip()
-
-        sale_order = SaleOrder.objects.create(
-            receipt_number=inquiry.shared_order_number or f"CRV-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-            sale_date=timezone.now().date(),
-            customer=inquiry.customer,
-            customer_name=inquiry.customer_name,
-            payment_method=payment_method,
-            subtotal=inquiry.estimated_total,
-            discount=Decimal('0.00'),
-            total_sales=inquiry.estimated_total,
-            total_cogs=Decimal('0.00'),
-            gross_profit=inquiry.estimated_total,
-            notes=notes,
-            created_by=request.user if request.user.is_authenticated else None
-        )
-
-        inquiry.converted_sale = sale_order
+        inquiry.payment_type = payment_method
         inquiry.status = InquiryStatus.COMPLETED
         inquiry.save()
+        sale_order = inquiry.auto_create_sale_order()
 
         return Response({
             'inquiry': self.get_serializer(inquiry).data,

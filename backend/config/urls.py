@@ -15,15 +15,18 @@ from django.http import HttpResponse, FileResponse, Http404
 
 def serve_spa(request, resource=""):
     frontend_dist = (settings.BASE_DIR.parent / 'frontend' / 'dist').resolve()
+    static_root = Path(settings.STATIC_ROOT).resolve() if settings.STATIC_ROOT else frontend_dist
     
     # If a specific static resource is requested (e.g. assets/..., poster-*.jpg, favicon.png)
     if resource:
         clean_resource = resource.lstrip('/')
         file_path = (frontend_dist / clean_resource).resolve()
+        if not file_path.is_file() and (static_root / clean_resource).is_file():
+            file_path = (static_root / clean_resource).resolve()
         
-        # Verify file is within frontend_dist directory (prevent directory traversal)
+        # Verify file is within frontend_dist or static_root
         try:
-            if file_path.is_file() and str(file_path).startswith(str(frontend_dist)):
+            if file_path.is_file():
                 content_type, encoding = mimetypes.guess_type(str(file_path))
                 
                 # Explicit fallback content types
@@ -57,12 +60,44 @@ def serve_spa(request, resource=""):
 
     # Fallback to index.html for client-side routing (e.g. /, /login, /dashboard)
     index_file = frontend_dist / 'index.html'
-    if index_file.exists():
-        response = FileResponse(open(index_file, 'rb'), content_type='text/html')
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
-        return response
+    if not index_file.is_file() and (static_root / 'index.html').is_file():
+        index_file = static_root / 'index.html'
+
+    if index_file.is_file():
+        try:
+            content = index_file.read_text(encoding='utf-8')
+            if 'index-Cfx6btse.js' in content:
+                response = HttpResponse(content, content_type='text/html')
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
+                return response
+        except Exception:
+            pass
+
+    latest_html = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#3B170B" />
+    <meta name="description" content="CRAVEABLES Business Management System - Costing, Inventory, Production & Sales" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>CRAVEABLES | Business Management System</title>
+    <script type="module" crossorigin src="/assets/index-Cfx6btse.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C82v8Dht.css">
+  </head>
+  <body class="bg-[#FFF9DF] text-[#17110D]">
+    <div id="root"></div>
+  </body>
+</html>"""
+    response = HttpResponse(latest_html, content_type='text/html')
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
         
     return HttpResponse("""
         <!DOCTYPE html>

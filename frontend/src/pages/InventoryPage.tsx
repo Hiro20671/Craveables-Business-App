@@ -411,6 +411,16 @@ export const InventoryPage: React.FC = () => {
 
   const totalScannedCost = scannedItems.reduce((sum, item) => sum + Number(item.total_cost || 0), 0);
 
+  const totalIngredientStockValue = ingredients.reduce((sum, ing) => {
+    return sum + (Number(ing.current_stock || 0) * Number(ing.cost_per_unit || 0));
+  }, 0);
+
+  const totalPackagingStockValue = packagingItems.reduce((sum, pkg) => {
+    return sum + Number(pkg.cost || 0);
+  }, 0);
+
+  const totalStockValue = totalIngredientStockValue + totalPackagingStockValue;
+
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
@@ -448,6 +458,63 @@ export const InventoryPage: React.FC = () => {
             <AlertTriangle className="w-4 h-4" />
             <span>Restock List ({lowStockCount + outOfStockCount})</span>
           </button>
+        </div>
+      </div>
+
+      {/* Stock Value & Inventory KPI Overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-bakery-muted uppercase tracking-wider">Total Stock Value</p>
+            <p className="text-xl sm:text-2xl font-display font-bold text-bakery-chocolate mt-0.5">
+              ₱{totalStockValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-bakery-caramel mt-0.5 font-medium">Ingredients &amp; Packaging</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-bakery-cream border border-bakery-beige flex items-center justify-center text-bakery-chocolate shadow-2xs">
+            <DollarSign className="w-5 h-5 text-bakery-caramel" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-bakery-muted uppercase tracking-wider">Ingredients Value</p>
+            <p className="text-xl sm:text-2xl font-display font-bold text-bakery-espresso mt-0.5">
+              ₱{totalIngredientStockValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-bakery-muted mt-0.5">{ingredients.length} raw ingredients</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-bakery-cream border border-bakery-beige flex items-center justify-center text-bakery-chocolate shadow-2xs">
+            <Boxes className="w-5 h-5 text-bakery-chocolate" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-bakery-muted uppercase tracking-wider">Packaging Value</p>
+            <p className="text-xl sm:text-2xl font-display font-bold text-bakery-espresso mt-0.5">
+              ₱{totalPackagingStockValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-bakery-muted mt-0.5">{packagingItems.length} packaging supplies</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-bakery-cream border border-bakery-beige flex items-center justify-center text-bakery-chocolate shadow-2xs">
+            <Package className="w-5 h-5 text-bakery-caramel" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige shadow-warm-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-bakery-muted uppercase tracking-wider">Restock Alert</p>
+            <p className={`text-xl sm:text-2xl font-display font-bold mt-0.5 ${lowStockCount + outOfStockCount > 0 ? 'text-status-orange' : 'text-status-green'}`}>
+              {lowStockCount + outOfStockCount} <span className="text-xs font-normal text-bakery-muted">items</span>
+            </p>
+            <p className="text-[10px] text-bakery-muted mt-0.5">
+              {outOfStockCount > 0 ? `${outOfStockCount} out of stock` : 'Healthy stock levels'}
+            </p>
+          </div>
+          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shadow-2xs ${lowStockCount + outOfStockCount > 0 ? 'bg-status-orange/10 border-status-orange/30 text-status-orange' : 'bg-status-green/10 border-status-green/30 text-status-green'}`}>
+            <AlertTriangle className="w-5 h-5" />
+          </div>
         </div>
       </div>
 

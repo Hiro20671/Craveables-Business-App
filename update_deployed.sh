@@ -61,3 +61,4 @@ echo "   - All 7 Production Batches & 172 Stock Transactions"
 echo "   - All 9 Real Expenses"
 echo "   - New Features: Batch Selector, Single Cookies, Wholesale Pricing, Receipt Scanner, Receipt PDFs"
 echo "=========================================================="
+
