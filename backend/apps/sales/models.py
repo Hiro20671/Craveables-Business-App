@@ -82,10 +82,15 @@ def match_product_variant(item_name: str, price=None):
 
 class Customer(models.Model):
     name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=50, db_index=True)
+    phone = models.CharField(max_length=50, blank=True, default='', db_index=True)
     email = models.EmailField(blank=True, default='')
     address = models.TextField(blank=True, default='')
     notes = models.TextField(blank=True, default='')
+    loyalty_card_number = models.CharField(max_length=50, blank=True, default='')
+    loyalty_stamps = models.PositiveIntegerField(default=0, help_text="Current active stamps")
+    manual_stamp_adjustment = models.IntegerField(default=0, help_text="Manual stamp adjustment by admin")
+    rewards_redeemed = models.PositiveIntegerField(default=0, help_text="Number of 5-stamp rewards claimed")
+    reward_notes = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -93,7 +98,27 @@ class Customer(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.phone})"
+        return f"{self.name} ({self.phone or 'No Phone'})"
+
+    @property
+    def qualifying_orders_count(self):
+        return self.orders.exclude(status='CANCELLED').filter(estimated_total__gte=Decimal('100.00')).count()
+
+    def recalculate_loyalty_stamps(self, save=True):
+        if not self.loyalty_card_number and self.pk:
+            self.loyalty_card_number = f"CRV-LOY-{self.pk:04d}"
+        auto_stamps = self.qualifying_orders_count
+        computed = max(0, auto_stamps + int(self.manual_stamp_adjustment or 0) - (int(self.rewards_redeemed or 0) * 5))
+        self.loyalty_stamps = computed
+        if save and self.pk:
+            Customer.objects.filter(pk=self.pk).update(
+                loyalty_card_number=self.loyalty_card_number,
+                loyalty_stamps=self.loyalty_stamps,
+                manual_stamp_adjustment=self.manual_stamp_adjustment,
+                rewards_redeemed=self.rewards_redeemed,
+                reward_notes=self.reward_notes,
+            )
+        return self.loyalty_stamps
 
     @property
     def total_orders(self):
@@ -106,8 +131,10 @@ class Customer(models.Model):
 
     @property
     def total_paid_amount(self):
-        total = self.payments.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
-        return round(total, 2)
+        # Include both CustomerPayment records and orders marked with amount_paid
+        order_paid = self.orders.exclude(status='CANCELLED').aggregate(total=models.Sum('amount_paid'))['total'] or Decimal('0.00')
+        payment_sum = self.payments.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        return round(max(order_paid, payment_sum), 2)
 
     @property
     def total_outstanding_balance(self):
@@ -190,7 +217,7 @@ class CustomerInquiry(models.Model):
     shared_order_number = models.CharField(max_length=50, blank=True, default='', db_index=True)
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     customer_name = models.CharField(max_length=150)
-    customer_phone = models.CharField(max_length=50)
+    customer_phone = models.CharField(max_length=50, blank=True, default='')
     order_type = models.CharField(max_length=50, default='REGULAR', help_text="REGULAR, WHOLESALE, CUSTOM, BULK, SPECIAL_EVENT")
     delivery_method = models.CharField(max_length=20, default='PICKUP', help_text="PICKUP or DELIVERY")
     delivery_address = models.TextField(blank=True, default='')
@@ -257,12 +284,30 @@ class CustomerInquiry(models.Model):
             else:
                 self.payment_status = PaymentStatus.UNPAID
 
+        # Auto-link Customer record if not yet linked so every customer gets a Loyalty Card automatically
+        if not self.customer_id and self.customer_name and self.customer_name.strip():
+            clean_name = self.customer_name.strip()
+            clean_phone = (self.customer_phone or '').strip()
+            cust = Customer.objects.filter(name__iexact=clean_name).first()
+            if not cust and clean_phone:
+                cust = Customer.objects.filter(phone=clean_phone).first()
+            if not cust:
+                cust = Customer.objects.create(
+                    name=clean_name,
+                    phone=clean_phone,
+                    address=self.delivery_address or '',
+                    notes=f"Auto-enrolled in CRAVEABLES Loyalty Card on {timezone.now().strftime('%Y-%m-%d')}"
+                )
+                cust.recalculate_loyalty_stamps()
+            self.customer = cust
+
         super().save(*args, **kwargs)
 
-        # Auto-connect to SaleOrder whenever order is COMPLETED or PAID
-        if self.status != InquiryStatus.CANCELLED and (
-            self.status == InquiryStatus.COMPLETED or self.payment_status == PaymentStatus.PAID
-        ):
+        if self.customer:
+            self.customer.recalculate_loyalty_stamps()
+
+        # Auto-connect to SaleOrder when order is PAID
+        if self.status != InquiryStatus.CANCELLED and self.payment_status == PaymentStatus.PAID:
             self.auto_create_sale_order()
 
     def auto_create_sale_order(self):
@@ -354,41 +399,63 @@ class CustomerInquiry(models.Model):
 
 
 def sync_all_inquiries_to_sales():
-    """Ensures all completed or paid orders are synced to SaleOrder and stale balances are repaired."""
+    """Ensures all paid orders are synced to SaleOrder, balances are accurate, and every customer has a Loyalty Card."""
+    today = timezone.now().date()
     for inq in CustomerInquiry.objects.select_related('converted_sale', 'customer').all():
         est = Decimal(str(inq.estimated_total or '0.00'))
         paid = Decimal(str(inq.amount_paid or '0.00'))
-        # If an order was already completed and converted to sale earlier, mark its payment as paid if it was still 0
-        if inq.status == InquiryStatus.COMPLETED and inq.converted_sale_id and paid == 0 and est > 0:
-            paid = est
-            inq.amount_paid = est
-            inq.remaining_balance = Decimal('0.00')
-            inq.payment_status = PaymentStatus.PAID
-            CustomerInquiry.objects.filter(pk=inq.pk).update(
-                amount_paid=est,
-                remaining_balance=Decimal('0.00'),
-                payment_status=PaymentStatus.PAID
-            )
-        else:
-            expected_bal = max(Decimal('0.00'), est - paid)
-            if inq.remaining_balance != expected_bal:
-                inq.remaining_balance = expected_bal
-                p_status = PaymentStatus.PAID if (expected_bal <= 0 and est > 0) else (
-                    PaymentStatus.PARTIALLY_PAID if paid > 0 else PaymentStatus.UNPAID
-                )
-                inq.payment_status = p_status
-                CustomerInquiry.objects.filter(pk=inq.pk).update(
-                    remaining_balance=expected_bal,
-                    payment_status=p_status
-                )
+        expected_bal = max(Decimal('0.00'), est - paid)
+        due_date = parse_date_safe(inq.payment_due_date)
 
-        if inq.status != InquiryStatus.CANCELLED and (
-            inq.status == InquiryStatus.COMPLETED or inq.payment_status == PaymentStatus.PAID
-        ):
+        if expected_bal <= 0 and est > 0:
+            p_status = PaymentStatus.PAID
+        elif paid > 0:
+            if due_date and due_date < today:
+                p_status = PaymentStatus.OVERDUE
+            elif due_date and (due_date - today).days <= 7:
+                p_status = PaymentStatus.DUE_SOON
+            else:
+                p_status = PaymentStatus.PARTIALLY_PAID
+        else:
+            if due_date and due_date < today:
+                p_status = PaymentStatus.OVERDUE
+            elif due_date and (due_date - today).days <= 7:
+                p_status = PaymentStatus.DUE_SOON
+            else:
+                p_status = PaymentStatus.UNPAID
+
+        # Auto-link customer if missing
+        cust = inq.customer
+        if not cust and inq.customer_name and inq.customer_name.strip():
+            clean_name = inq.customer_name.strip()
+            clean_phone = (inq.customer_phone or '').strip()
+            cust = Customer.objects.filter(name__iexact=clean_name).first()
+            if not cust:
+                cust = Customer.objects.create(
+                    name=clean_name,
+                    phone=clean_phone,
+                    address=inq.delivery_address or '',
+                    notes="Auto-enrolled in CRAVEABLES Loyalty Card"
+                )
+            inq.customer = cust
+            CustomerInquiry.objects.filter(pk=inq.pk).update(customer=cust)
+
+        if inq.remaining_balance != expected_bal or inq.payment_status != p_status:
+            inq.remaining_balance = expected_bal
+            inq.payment_status = p_status
+            CustomerInquiry.objects.filter(pk=inq.pk).update(
+                remaining_balance=expected_bal,
+                payment_status=p_status
+            )
+
+        if inq.status != InquiryStatus.CANCELLED and inq.payment_status == PaymentStatus.PAID:
             try:
                 inq.auto_create_sale_order()
             except Exception:
                 pass
+
+    for cust in Customer.objects.all():
+        cust.recalculate_loyalty_stamps()
 
 
 class CustomerPayment(models.Model):

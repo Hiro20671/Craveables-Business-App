@@ -315,6 +315,12 @@ export interface Customer {
   email: string;
   address: string;
   notes: string;
+  loyalty_card_number?: string;
+  loyalty_stamps?: number;
+  manual_stamp_adjustment?: number;
+  rewards_redeemed?: number;
+  reward_notes?: string;
+  qualifying_orders_count?: number;
   total_orders: number;
   total_ordered_amount: number | string;
   total_paid_amount: number | string;

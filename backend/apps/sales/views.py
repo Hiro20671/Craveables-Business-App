@@ -310,6 +310,81 @@ def generate_inquiry_receipt_pdf(inquiry, inline=False):
         inline=inline,
     )
 
+
+def render_loyalty_card_png(customer, inline=False):
+    from django.conf import settings
+    root_dir = settings.BASE_DIR.parent
+    bg_candidates = [
+        os.path.join(root_dir, 'frontend', 'public', 'loyalty-card-bg.jpg'),
+        os.path.join(root_dir, 'frontend', 'dist', 'loyalty-card-bg.jpg'),
+    ]
+    logo_candidates = [
+        os.path.join(root_dir, 'frontend', 'public', 'logo.png'),
+        os.path.join(root_dir, 'frontend', 'dist', 'logo.png'),
+    ]
+
+    bg_path = next((p for p in bg_candidates if os.path.exists(p)), None)
+    logo_path = next((p for p in logo_candidates if os.path.exists(p)), None)
+
+    if bg_path:
+        card_img = Image.open(bg_path).convert('RGBA').resize((1004, 591), Image.Resampling.LANCZOS)
+    else:
+        card_img = Image.new('RGBA', (1004, 591), (244, 234, 219, 255))
+
+    # Stamp the circular CRAVEABLES logo inside earned stamp circles
+    stamps_to_draw = min(5, max(0, int(customer.loyalty_stamps or 0)))
+    x_centers = [123, 275, 426, 577, 729]
+    y_center = 373
+    stamp_size = 112
+
+    if logo_path and stamps_to_draw > 0:
+        logo_raw = Image.open(logo_path).convert('RGBA').resize((stamp_size, stamp_size), Image.Resampling.LANCZOS)
+        # Circular alpha mask
+        mask = Image.new('L', (stamp_size, stamp_size), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.ellipse((2, 2, stamp_size - 2, stamp_size - 2), fill=255)
+
+        for idx in range(stamps_to_draw):
+            cx = x_centers[idx]
+            top_left = (int(cx - stamp_size // 2), int(y_center - stamp_size // 2))
+            card_img.paste(logo_raw, top_left, mask)
+
+    # Create final canvas with personalized customer footer bar
+    footer_height = 76
+    canvas = Image.new('RGB', (1004, 591 + footer_height), '#3B170B')
+    canvas.paste(card_img.convert('RGB'), (0, 0))
+
+    draw = ImageDraw.Draw(canvas)
+    font_name = _load_receipt_font(20, bold=True)
+    font_meta = _load_receipt_font(14, bold=True)
+    font_badge = _load_receipt_font(15, bold=True)
+
+    card_no = customer.loyalty_card_number or f"CRV-LYL-{customer.id:04d}"
+    holder_text = f"CARD HOLDER: {customer.name.upper()}   •   {card_no}"
+    draw.text((32, 591 + 24), holder_text, fill='#FFF9DF', font=font_name)
+
+    sub_text = f"Qualifying Orders (>= PHP 100): {customer.qualifying_orders_count}   •   Free Brownie Rewards Claimed: {customer.rewards_redeemed}"
+    draw.text((32, 591 + 50), sub_text, fill='#E9D8B8', font=font_meta)
+
+    status_pill_text = (
+        f"READY FOR FREE BROWNIES! ({customer.loyalty_stamps}/5 STAMPS)"
+        if customer.loyalty_stamps >= 5
+        else f"ACTIVE STAMPS: {customer.loyalty_stamps} / 5"
+    )
+    pill_bg = '#15803D' if customer.loyalty_stamps >= 5 else '#6A2E1B'
+    draw.rounded_rectangle((650, 591 + 18, 976, 591 + 58), radius=14, fill=pill_bg, outline='#E9D8B8', width=1)
+    draw.text((813, 591 + 38), status_pill_text, fill='#FFF9DF', font=font_badge, anchor='mm')
+
+    buffer = io.BytesIO()
+    canvas.save(buffer, format='PNG', optimize=True)
+    buffer.seek(0)
+
+    safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '-' for c in (customer.name or 'Customer'))
+    disposition = 'inline' if inline else 'attachment'
+    response = HttpResponse(buffer.getvalue(), content_type='image/png')
+    response['Content-Disposition'] = f'{disposition}; filename="CRAVEABLES-Loyalty-Card-{safe_name}.png"'
+    return response
+
 class SaleOrderViewSet(viewsets.ModelViewSet):
     queryset = SaleOrder.objects.all().prefetch_related(
         'items__product_variant__product'
@@ -475,21 +550,25 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('name')
     serializer_class = CustomerSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
+        sync_all_inquiries_to_sales()
         qs = super().get_queryset()
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
                 Q(name__icontains=search) |
                 Q(phone__icontains=search) |
-                Q(email__icontains=search)
+                Q(email__icontains=search) |
+                Q(loyalty_card_number__icontains=search)
             )
         return qs
 
     @action(detail=True, methods=['get'], url_path='history')
     def customer_history(self, request, pk=None):
         customer = self.get_object()
+        customer.recalculate_loyalty_stamps()
         orders = customer.orders.all().order_by('-created_at')
         payments = customer.payments.all().order_by('-payment_date', '-id')
         return Response({
@@ -497,6 +576,51 @@ class CustomerViewSet(viewsets.ModelViewSet):
             'orders': CustomerInquirySerializer(orders, many=True).data,
             'payments': CustomerPaymentSerializer(payments, many=True).data,
         })
+
+    @action(detail=True, methods=['post'], url_path='update-loyalty')
+    @transaction.atomic
+    def update_loyalty(self, request, pk=None):
+        customer = self.get_object()
+        action_type = request.data.get('action_type', 'set_stamps')
+        auto_stamps = customer.qualifying_orders_count - (customer.rewards_redeemed * 5)
+
+        if action_type == 'add_stamp':
+            customer.manual_stamp_adjustment = (customer.manual_stamp_adjustment or 0) + 1
+        elif action_type == 'remove_stamp':
+            current_total = max(0, auto_stamps + (customer.manual_stamp_adjustment or 0))
+            if current_total > 0:
+                customer.manual_stamp_adjustment = (customer.manual_stamp_adjustment or 0) - 1
+        elif action_type == 'set_stamps':
+            target_stamps = max(0, int(request.data.get('stamps', customer.loyalty_stamps)))
+            customer.manual_stamp_adjustment = target_stamps - auto_stamps
+        elif action_type == 'redeem_reward':
+            current_total = max(0, auto_stamps + (customer.manual_stamp_adjustment or 0))
+            if current_total < 5:
+                return Response({'detail': 'Customer needs at least 5 stamps to redeem a free small box of brownies.'}, status=status.HTTP_400_BAD_REQUEST)
+            customer.rewards_redeemed = (customer.rewards_redeemed or 0) + 1
+            stamp_note = f"Redeemed 1 FREE Small Box of Brownies (3 pcs) on {timezone.now().strftime('%Y-%m-%d')}"
+            customer.reward_notes = f"{customer.reward_notes}\n{stamp_note}".strip() if customer.reward_notes else stamp_note
+
+        if 'rewards_redeemed' in request.data and action_type != 'redeem_reward':
+            customer.rewards_redeemed = max(0, int(request.data.get('rewards_redeemed', customer.rewards_redeemed)))
+            if action_type == 'set_stamps':
+                auto_stamps = customer.qualifying_orders_count - (customer.rewards_redeemed * 5)
+                target_stamps = max(0, int(request.data.get('stamps', customer.loyalty_stamps)))
+                customer.manual_stamp_adjustment = target_stamps - auto_stamps
+
+        if 'reward_notes' in request.data:
+            customer.reward_notes = request.data.get('reward_notes', '')
+
+        customer.save()
+        customer.recalculate_loyalty_stamps()
+        return Response(CustomerSerializer(customer).data)
+
+    @action(detail=True, methods=['get'], url_path='loyalty-card-image')
+    def loyalty_card_image(self, request, pk=None):
+        customer = self.get_object()
+        customer.recalculate_loyalty_stamps()
+        inline = request.query_params.get('inline') == '1'
+        return render_loyalty_card_png(customer, inline=inline)
 
 class CustomerPaymentViewSet(viewsets.ModelViewSet):
     queryset = CustomerPayment.objects.all().select_related('order', 'customer', 'recorded_by').order_by('-payment_date', '-id')
@@ -649,12 +773,12 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         payment_due_date = parse_date_safe(data.get('payment_due_date'))
         payment_notes = data.get('payment_notes', '')
 
-        # Customer Profile Linking / Creation (prevents duplicate customer records)
+        # Customer Profile Linking / Creation (auto-enrolls customer in Loyalty Card by name)
         customer = None
-        if customer_phone:
-            customer = Customer.objects.filter(phone=customer_phone).first()
-        if not customer and customer_name and customer_name != 'Customer':
+        if customer_name and customer_name != 'Customer':
             customer = Customer.objects.filter(name__iexact=customer_name).first()
+        if not customer and customer_phone:
+            customer = Customer.objects.filter(phone=customer_phone, name__iexact=customer_name).first()
 
         if not customer and customer_name:
             customer = Customer.objects.create(
@@ -662,10 +786,11 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
                 phone=customer_phone,
                 email=customer_email,
                 address=delivery_address,
-                notes=f"First order placed on {timezone.now().strftime('%Y-%m-%d')}"
+                notes=f"Auto-enrolled in CRAVEABLES Loyalty Card on {timezone.now().strftime('%Y-%m-%d')}"
             )
         elif customer:
-            # Update customer details if provided
+            if customer_phone and not customer.phone:
+                customer.phone = customer_phone
             if customer_email and not customer.email:
                 customer.email = customer_email
             if delivery_address and not customer.address:
@@ -676,8 +801,8 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             inquiry_number=inquiry_number,
             shared_order_number=inquiry_number,
             customer=customer,
-            customer_name=customer.name if customer else customer_name,
-            customer_phone=customer.phone if customer else customer_phone,
+            customer_name=customer_name,
+            customer_phone=customer_phone or (customer.phone if customer else ''),
             order_type=order_type,
             delivery_method=delivery_method,
             delivery_address=delivery_address,
@@ -720,10 +845,32 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         if new_status in InquiryStatus.values:
             inquiry.status = new_status
             inquiry.save()
-            if inquiry.status == InquiryStatus.COMPLETED and not inquiry.converted_sale_id:
+            if inquiry.status == InquiryStatus.COMPLETED and not inquiry.converted_sale_id and inquiry.payment_status == PaymentStatus.PAID:
                 inquiry.auto_create_sale_order()
             return Response(self.get_serializer(inquiry).data)
         return Response({'detail': f'Invalid status. Allowed: {list(InquiryStatus.values)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='mark-given-due')
+    @transaction.atomic
+    def mark_given_due(self, request, pk=None):
+        """Marks an order as handed over / given to customer with a 1-week (or custom) payment due date while keeping it unpaid."""
+        inquiry = self.get_object()
+        days = int(request.data.get('days', 7))
+        custom_due = parse_date_safe(request.data.get('payment_due_date'))
+        due_date = custom_due or (timezone.now().date() + timezone.timedelta(days=days))
+
+        if request.data.get('reset_unpaid'):
+            inquiry.amount_paid = Decimal('0.00')
+            inquiry.initial_deposit = Decimal('0.00')
+            inquiry.payments.all().delete()
+
+        inquiry.status = InquiryStatus.COMPLETED
+        inquiry.payment_due_date = due_date
+        inquiry.payment_type = 'PAY_LATER_1_WEEK'
+        due_note = f"Order given to customer on {timezone.now().strftime('%Y-%m-%d')} • Payment due on {due_date.strftime('%Y-%m-%d')} ({days} days)"
+        inquiry.payment_notes = due_note
+        inquiry.save()
+        return Response(self.get_serializer(inquiry).data)
 
     @action(detail=True, methods=['post'], url_path='record-payment')
     @transaction.atomic

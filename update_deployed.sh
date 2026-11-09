@@ -57,11 +57,11 @@ fi
 # 4. Verify frontend/dist bundle integrity & link zero-byte staticfiles
 echo "🎨 [3/6] Verifying production frontend bundle & linking static assets..."
 mkdir -p frontend/dist/assets
-if [ ! -s "frontend/dist/assets/index-Dl0cSSLw.js" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-Dl0cSSLw.js -o frontend/dist/assets/index-Dl0cSSLw.js
+if [ ! -s "frontend/dist/assets/index-DCWHiOGG.js" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DCWHiOGG.js -o frontend/dist/assets/index-DCWHiOGG.js
 fi
-if [ ! -s "frontend/dist/assets/index-DmbG5mO5.css" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DmbG5mO5.css -o frontend/dist/assets/index-DmbG5mO5.css
+if [ ! -s "frontend/dist/assets/index-DX2HynaH.css" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DX2HynaH.css -o frontend/dist/assets/index-DX2HynaH.css
 fi
 if [ ! -s "frontend/dist/index.html" ]; then
     curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/index.html -o frontend/dist/index.html
@@ -74,8 +74,8 @@ for item in "$REPO_DIR"/frontend/dist/*; do
     ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
 done
 
-echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-Dl0cSSLw.js) bytes"
-echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-DmbG5mO5.css) bytes"
+echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-DCWHiOGG.js) bytes"
+echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-DX2HynaH.css) bytes"
 
 # 5. Locate & activate virtual environment
 echo "🐍 [4/6] Activating Python environment..."
@@ -100,30 +100,14 @@ python -c "import django, rest_framework, corsheaders, whitenoise, reportlab, PI
 echo "🗄️ [5/6] Applying schema migrations while keeping all your live orders & records untouched..."
 python backend/manage.py migrate
 
-# Repair only the 3 duplicate placeholder FeaturedOrder titles if they are still identical duplicates
+# Sync inquiries -> customers/loyalty cards (never touches FeaturedOrder or deletes data)
 python -c "
 import os, sys, django
 sys.path.insert(0, 'backend')
 os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings'
 django.setup()
-from apps.sales.models import FeaturedOrder, sync_all_inquiries_to_sales
+from apps.sales.models import sync_all_inquiries_to_sales
 sync_all_inquiries_to_sales()
-f2 = FeaturedOrder.objects.filter(id=2, title__icontains='BDO Lucena').first()
-if f2 and not f2.image:
-    f2.title = '60-Piece Classic Brownie Birthday Celebration Tower'
-    f2.description = 'Custom fudgy brownie squares individually wrapped with red bows for a 30th birthday gathering in Lucena City.'
-    f2.category = 'Brownies'
-    f2.order_type = 'Birthday Hamper'
-    f2.pieces_count = 60
-    f2.save()
-f3 = FeaturedOrder.objects.filter(id=3, title__icontains='BDO Lucena').first()
-if f3 and not f3.image:
-    f3.title = 'Artisanal Lakatan Banana Loaves with Sliced Almonds'
-    f3.description = 'Freshly harvested Philippine Lakatan bananas baked in aluminum tins with red bows and wooden spoons for family weekend hampers.'
-    f3.category = 'Cakes'
-    f3.order_type = 'Family Box'
-    f3.pieces_count = 24
-    f3.save()
 " 2>/dev/null || true
 
 # 7. Reload PythonAnywhere Web App automatically

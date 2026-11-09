@@ -39,7 +39,10 @@ import {
   Building,
   Mail,
   ChevronRight,
-  Maximize2
+  Maximize2,
+  Award,
+  Gift,
+  Download
 } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateWholesaleDiscount, getWholesaleDescription } from '../utils/pricing';
@@ -58,8 +61,12 @@ import {
 export const OrdersPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [pageTab, setPageTab] = useState<'ORDERS' | 'WHOLESALE' | 'FEATURED_GALLERY' | 'CUSTOMERS' | 'RECEIVABLES' | 'REVIEWS'>(
-    location.pathname.startsWith('/wholesale-orders') ? 'WHOLESALE' : 'ORDERS'
+  const [pageTab, setPageTab] = useState<'ORDERS' | 'WHOLESALE' | 'LOYALTY' | 'FEATURED_GALLERY' | 'CUSTOMERS' | 'RECEIVABLES' | 'REVIEWS'>(
+    location.pathname.startsWith('/wholesale-orders')
+      ? 'WHOLESALE'
+      : location.pathname.startsWith('/loyalty-cards')
+      ? 'LOYALTY'
+      : 'ORDERS'
   );
   const [inquiries, setInquiries] = useState<CustomerInquiry[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -71,11 +78,22 @@ export const OrdersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters & Search for Orders
+  // Filters & Search for Orders (including Paid vs Unpaid vs Order Given 1-Week Due separation)
   const [statusFilter, setStatusFilter] = useState<'ALL' | OrderWorkflowStatus>('ALL');
+  const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'UNPAID' | 'GIVEN_DUE' | 'PAID'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'TARGET_DATE' | 'NEWEST'>('TARGET_DATE');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Loyalty Cards Management states
+  const [loyaltySearch, setLoyaltySearch] = useState('');
+  const [loyaltyFilter, setLoyaltyFilter] = useState<'ALL' | 'READY' | 'ACTIVE' | 'ZERO'>('ALL');
+  const [updatingLoyaltyId, setUpdatingLoyaltyId] = useState<number | null>(null);
+  const [loyaltyPreviewCustomer, setLoyaltyPreviewCustomer] = useState<Customer | null>(null);
+  const [editingLoyaltyCustomer, setEditingLoyaltyCustomer] = useState<Customer | null>(null);
+  const [manualStampsInput, setManualStampsInput] = useState<string>('0');
+  const [manualRewardsInput, setManualRewardsInput] = useState<string>('0');
+  const [manualRewardNotes, setManualRewardNotes] = useState<string>('');
 
   // Customer Management states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -176,7 +194,9 @@ export const OrdersPage: React.FC = () => {
   useEffect(() => {
     if (location.pathname.startsWith('/wholesale-orders')) {
       setPageTab('WHOLESALE');
-    } else if (location.pathname.startsWith('/orders') && pageTab === 'WHOLESALE') {
+    } else if (location.pathname.startsWith('/loyalty-cards')) {
+      setPageTab('LOYALTY');
+    } else if (location.pathname.startsWith('/orders') && (pageTab === 'WHOLESALE' || pageTab === 'LOYALTY')) {
       setPageTab('ORDERS');
     }
   }, [location.pathname]);
@@ -222,6 +242,70 @@ export const OrdersPage: React.FC = () => {
       await fetchData();
     } catch (err: any) {
       alert(err.message || 'Failed to update order status');
+    }
+  };
+
+  // Mark Order Given to Customer with 1-Week Payment Due Date (Pay Later)
+  const handleMarkGivenDue = async (inq: CustomerInquiry, resetUnpaid = false) => {
+    const dueStr = new Date(Date.now() + 7 * 86400000).toLocaleDateString();
+    const confirmMsg = resetUnpaid
+      ? `Mark order ${inq.shared_order_number || inq.inquiry_number} (${inq.customer_name}) as UNPAID & Order Given with a 1-Week Due Date (${dueStr})?`
+      : `Mark order ${inq.shared_order_number || inq.inquiry_number} (${inq.customer_name}) as GIVEN TO CUSTOMER with payment due in 1 week (${dueStr})?`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      await api.markOrderGivenWithDue(inq.id, { days: 7, reset_unpaid: resetUnpaid });
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to set 1-week due date');
+    }
+  };
+
+  // Loyalty Card Stamp & Reward Actions
+  const handleUpdateLoyalty = async (
+    cust: Customer,
+    actionType: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward',
+    stamps?: number
+  ) => {
+    if (actionType === 'redeem_reward') {
+      if (!window.confirm(`Redeem 5 stamps for ${cust.name} to claim 1 FREE Small Box of Brownies (3 pcs)?`)) {
+        return;
+      }
+    }
+    try {
+      setUpdatingLoyaltyId(cust.id);
+      await api.updateCustomerLoyalty(cust.id, { action_type: actionType, stamps });
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update loyalty card');
+    } finally {
+      setUpdatingLoyaltyId(null);
+    }
+  };
+
+  const openEditLoyaltyModal = (cust: Customer) => {
+    setEditingLoyaltyCustomer(cust);
+    setManualStampsInput(String(cust.loyalty_stamps || 0));
+    setManualRewardsInput(String(cust.rewards_redeemed || 0));
+    setManualRewardNotes(cust.reward_notes || '');
+  };
+
+  const handleSaveManualLoyalty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLoyaltyCustomer) return;
+    try {
+      setUpdatingLoyaltyId(editingLoyaltyCustomer.id);
+      await api.updateCustomerLoyalty(editingLoyaltyCustomer.id, {
+        action_type: 'set_stamps',
+        stamps: Math.max(0, parseInt(manualStampsInput, 10) || 0),
+        rewards_redeemed: Math.max(0, parseInt(manualRewardsInput, 10) || 0),
+        reward_notes: manualRewardNotes.trim(),
+      });
+      setEditingLoyaltyCustomer(null);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save loyalty card adjustments');
+    } finally {
+      setUpdatingLoyaltyId(null);
     }
   };
 
@@ -665,6 +749,25 @@ export const OrdersPage: React.FC = () => {
   const wholesaleOrders = inquiries.filter((i) => i.order_type === 'WHOLESALE');
   const activePool = pageTab === 'WHOLESALE' ? wholesaleOrders : regularOrders;
 
+  const getOrderBalance = (i: CustomerInquiry) =>
+    Number(i.remaining_balance ?? (Number(i.estimated_total || 0) - Number(i.amount_paid || 0)));
+
+  const isOrderPaid = (i: CustomerInquiry) =>
+    i.status !== 'CANCELLED' && (i.payment_status === 'PAID' || getOrderBalance(i) <= 0);
+
+  const isOrderGivenDue = (i: CustomerInquiry) =>
+    i.status !== 'CANCELLED' &&
+    getOrderBalance(i) > 0 &&
+    (i.status === 'COMPLETED' || i.payment_type === 'PAY_LATER_1_WEEK' || Boolean(i.payment_due_date));
+
+  const unpaidPoolOrders = activePool.filter((i) => i.status !== 'CANCELLED' && getOrderBalance(i) > 0);
+  const givenDuePoolOrders = activePool.filter(isOrderGivenDue);
+  const paidPoolOrders = activePool.filter(isOrderPaid);
+
+  const unpaidPoolBalance = unpaidPoolOrders.reduce((s, i) => s + getOrderBalance(i), 0);
+  const givenDuePoolBalance = givenDuePoolOrders.reduce((s, i) => s + getOrderBalance(i), 0);
+  const paidPoolAmount = paidPoolOrders.reduce((s, i) => s + Number(i.estimated_total || 0), 0);
+
   // Order counts & metrics for active pool
   const totalInquiries = activePool.length;
   const newCount = activePool.filter((i) => i.status === 'NEW').length;
@@ -683,6 +786,9 @@ export const OrdersPage: React.FC = () => {
   const filteredInquiries = activePool
     .filter((inq) => {
       if (statusFilter !== 'ALL' && inq.status !== statusFilter) return false;
+      if (paymentFilter === 'PAID' && !isOrderPaid(inq)) return false;
+      if (paymentFilter === 'UNPAID' && (inq.status === 'CANCELLED' || getOrderBalance(inq) <= 0)) return false;
+      if (paymentFilter === 'GIVEN_DUE' && !isOrderGivenDue(inq)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = inq.customer_name?.toLowerCase().includes(q);
@@ -704,13 +810,36 @@ export const OrdersPage: React.FC = () => {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
+  // Loyalty Cards Metrics & Filter
+  const totalStampsAwarded = customers.reduce((s, c) => s + Number(c.loyalty_stamps || 0), 0);
+  const readyForRewardCount = customers.filter((c) => Number(c.loyalty_stamps || 0) >= 5).length;
+  const totalRewardsRedeemed = customers.reduce((s, c) => s + Number(c.rewards_redeemed || 0), 0);
+
+  const filteredLoyaltyCustomers = customers
+    .filter((c) => {
+      const stamps = Number(c.loyalty_stamps || 0);
+      if (loyaltyFilter === 'READY' && stamps < 5) return false;
+      if (loyaltyFilter === 'ACTIVE' && (stamps < 1 || stamps >= 5)) return false;
+      if (loyaltyFilter === 'ZERO' && stamps !== 0) return false;
+      if (loyaltySearch.trim()) {
+        const q = loyaltySearch.toLowerCase();
+        return (
+          c.name.toLowerCase().includes(q) ||
+          (c.phone || '').toLowerCase().includes(q) ||
+          (c.loyalty_card_number || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => Number(b.loyalty_stamps || 0) - Number(a.loyalty_stamps || 0));
+
   // Customers Filter
   const filteredCustomers = customers.filter((c) => {
     if (!customerSearch.trim()) return true;
     const q = customerSearch.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
-      c.phone.toLowerCase().includes(q) ||
+      (c.phone || '').toLowerCase().includes(q) ||
       c.email?.toLowerCase().includes(q) ||
       c.address?.toLowerCase().includes(q)
     );
@@ -744,21 +873,13 @@ export const OrdersPage: React.FC = () => {
   // Helpers for badges
   const renderPaymentBadge = (inq: CustomerInquiry) => {
     const status = inq.payment_status || 'UNPAID';
-    const balance = Number(inq.remaining_balance ?? (Number(inq.estimated_total || 0) - Number(inq.amount_paid || 0)));
+    const balance = getOrderBalance(inq);
 
-    if (status === 'PAID') {
+    if (status === 'PAID' || balance <= 0) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-green/10 text-status-green border border-status-green/20">
           <CheckCircle2 className="w-3 h-3" />
           <span>Fully Paid</span>
-        </span>
-      );
-    }
-    if (status === 'PARTIALLY_PAID') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
-          <Clock className="w-3 h-3" />
-          <span>Partial (Bal: ₱{balance.toFixed(2)})</span>
         </span>
       );
     }
@@ -770,6 +891,25 @@ export const OrdersPage: React.FC = () => {
         </span>
       );
     }
+    if (isOrderGivenDue(inq)) {
+      const dueLabel = inq.payment_due_date
+        ? `Due ${new Date(inq.payment_due_date).toLocaleDateString()}`
+        : '1-Week Due';
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-800 border border-amber-500/40">
+          <Clock className="w-3 h-3" />
+          <span>Given • {dueLabel} (₱{balance.toFixed(2)})</span>
+        </span>
+      );
+    }
+    if (status === 'PARTIALLY_PAID') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+          <Clock className="w-3 h-3" />
+          <span>Partial (Bal: ₱{balance.toFixed(2)})</span>
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-orange/10 text-status-orange border border-status-orange/20">
         <AlertCircle className="w-3 h-3" />
@@ -778,7 +918,14 @@ export const OrdersPage: React.FC = () => {
     );
   };
 
-  const renderStatusBadge = (status: OrderWorkflowStatus) => {
+  const renderStatusBadge = (status: OrderWorkflowStatus, inq?: CustomerInquiry) => {
+    if (inq && status === 'COMPLETED' && getOrderBalance(inq) > 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-500/15 border-amber-500/40 text-amber-900">
+          📦 Order Given (Pay Later)
+        </span>
+      );
+    }
     const config: Record<string, { bg: string; text: string; label: string }> = {
       NEW: { bg: 'bg-blue-500/10 border-blue-500/30', text: 'text-blue-700', label: 'New Order' },
       PENDING: { bg: 'bg-amber-500/10 border-amber-500/30', text: 'text-amber-700', label: 'Pending' },
@@ -807,13 +954,17 @@ export const OrdersPage: React.FC = () => {
             <h1 className="font-display font-bold text-2xl sm:text-3xl text-bakery-chocolate">
               {pageTab === 'WHOLESALE'
                 ? 'Whole Sales Order — Reseller & Bulk Hub'
+                : pageTab === 'LOYALTY'
+                ? 'CRAVEABLES Customer Loyalty Cards'
                 : 'Customer Orders & Storefront Hub'}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-bakery-muted mt-1">
             {pageTab === 'WHOLESALE'
               ? 'Dedicated reseller order list with automatic volume & product wholesale discounts connected to Sales & Production.'
-              : 'Manage incoming pre-orders, kitchen production runs, customer database, accounts receivable, and gallery photos.'}
+              : pageTab === 'LOYALTY'
+              ? 'Official CRAVEABLES Loyalty Card manager: automatic 1 stamp per order ₱100+ and manual stamp & free brownie reward management.'
+              : 'Manage incoming pre-orders, kitchen production runs, customer loyalty cards, accounts receivable, and gallery photos.'}
           </p>
         </div>
 
@@ -823,7 +974,7 @@ export const OrdersPage: React.FC = () => {
             <button
               onClick={() => {
                 setPageTab('ORDERS');
-                if (location.pathname.startsWith('/wholesale-orders')) navigate('/orders');
+                if (location.pathname.startsWith('/wholesale-orders') || location.pathname.startsWith('/loyalty-cards')) navigate('/orders');
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                 pageTab === 'ORDERS'
@@ -853,6 +1004,24 @@ export const OrdersPage: React.FC = () => {
               <span>Whole Sales Order</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
                 {wholesaleOrders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPageTab('LOYALTY');
+                if (!location.pathname.startsWith('/loyalty-cards')) navigate('/loyalty-cards');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                pageTab === 'LOYALTY'
+                  ? 'bg-bakery-chocolate text-white shadow-warm-xs'
+                  : 'text-bakery-chocolate hover:text-bakery-caramel'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>Loyalty Cards</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-600 text-white">
+                {customers.length}
               </span>
             </button>
 
@@ -1051,6 +1220,29 @@ export const OrdersPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Paid vs Unpaid vs Order Given (1-Week Due) Separation */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {([
+              { key: 'ALL', label: 'All Orders', count: activePool.length, sub: '', cls: 'border-bakery-beige' },
+              { key: 'UNPAID', label: '⏳ Unpaid', count: unpaidPoolOrders.length, sub: `₱${unpaidPoolBalance.toFixed(2)} to collect`, cls: 'border-red-300' },
+              { key: 'GIVEN_DUE', label: '📦 Given • Due', count: givenDuePoolOrders.length, sub: `₱${givenDuePoolBalance.toFixed(2)} pay later`, cls: 'border-amber-400' },
+              { key: 'PAID', label: '✅ Paid', count: paidPoolOrders.length, sub: `₱${paidPoolAmount.toFixed(2)} collected`, cls: 'border-emerald-400' },
+            ] as const).map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPaymentFilter(p.key)}
+                className={`p-3 rounded-2xl text-left border-2 transition-all ${p.cls} ${
+                  paymentFilter === p.key ? 'bg-bakery-chocolate text-white shadow-warm-sm' : 'bg-bakery-ivory text-bakery-chocolate hover:shadow-warm-xs'
+                }`}
+              >
+                <span className="text-xs font-bold block">{p.label}</span>
+                <span className="font-display font-bold text-xl">{p.count}</span>
+                {p.sub && <span className="block text-[10px] opacity-80">{p.sub}</span>}
+              </button>
+            ))}
+          </div>
+
           {/* Action Bar & Filters */}
           <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-warm-xs">
             <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -1214,7 +1406,7 @@ export const OrdersPage: React.FC = () => {
                         </div>
 
                         <div className="flex flex-col items-end gap-1">
-                          {renderStatusBadge(inq.status)}
+                          {renderStatusBadge(inq.status, inq)}
                           {renderPaymentBadge(inq)}
                         </div>
                       </div>
@@ -1291,6 +1483,18 @@ export const OrdersPage: React.FC = () => {
                           >
                             <CreditCard className="w-3.5 h-3.5" />
                             <span>Pay ₱{balance.toFixed(0)}</span>
+                          </button>
+                        )}
+
+                        {balance > 0 && inq.status !== 'CANCELLED' && !isOrderGivenDue(inq) && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkGivenDue(inq)}
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
+                            title="Order given to customer; payment due in 1 week"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Given • 1-Wk Due</span>
                           </button>
                         )}
 
@@ -1400,7 +1604,7 @@ export const OrdersPage: React.FC = () => {
                             ₱{Number(inq.estimated_total || 0).toFixed(2)}
                           </td>
                           <td className="py-3 px-4">{renderPaymentBadge(inq)}</td>
-                          <td className="py-3 px-4">{renderStatusBadge(inq.status)}</td>
+                          <td className="py-3 px-4">{renderStatusBadge(inq.status, inq)}</td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               {balance > 0 && (
@@ -1410,6 +1614,15 @@ export const OrdersPage: React.FC = () => {
                                   title="Record Payment"
                                 >
                                   Pay
+                                </button>
+                              )}
+                              {balance > 0 && inq.status !== 'CANCELLED' && !isOrderGivenDue(inq) && (
+                                <button
+                                  onClick={() => handleMarkGivenDue(inq)}
+                                  className="px-2 py-1 rounded bg-amber-500 text-white font-bold text-[10px] hover:bg-amber-600"
+                                  title="Given • 1-Week Due"
+                                >
+                                  1-Wk Due
                                 </button>
                               )}
                               {!inq.converted_sale && inq.status !== 'CANCELLED' && (
@@ -1467,6 +1680,170 @@ export const OrdersPage: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB: LOYALTY CARDS */}
+      {pageTab === 'LOYALTY' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige">
+              <span className="text-[11px] font-bold text-bakery-muted uppercase">Enrolled Customers</span>
+              <p className="text-2xl font-display font-bold text-bakery-chocolate">{customers.length}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige">
+              <span className="text-[11px] font-bold text-bakery-muted uppercase">Active Stamps</span>
+              <p className="text-2xl font-display font-bold text-bakery-caramel">{totalStampsAwarded}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300">
+              <span className="text-[11px] font-bold text-emerald-800 uppercase">Ready for Free Brownies</span>
+              <p className="text-2xl font-display font-bold text-emerald-700">{readyForRewardCount}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-bakery-chocolate text-white">
+              <span className="text-[11px] font-bold text-bakery-cream/70 uppercase">Rewards Redeemed</span>
+              <p className="text-2xl font-display font-bold">{totalRewardsRedeemed}</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-bakery-ivory border border-bakery-beige flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bakery-muted" />
+              <input
+                type="text"
+                placeholder="Search name, phone, card #..."
+                value={loyaltySearch}
+                onChange={(e) => setLoyaltySearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
+              />
+            </div>
+            <select
+              value={loyaltyFilter}
+              onChange={(e) => setLoyaltyFilter(e.target.value as any)}
+              className="px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs font-semibold text-bakery-chocolate"
+            >
+              <option value="ALL">All Cards</option>
+              <option value="READY">Ready for reward (5+)</option>
+              <option value="ACTIVE">Collecting (1-4)</option>
+              <option value="ZERO">No stamps yet</option>
+            </select>
+            <p className="text-[11px] text-bakery-muted">Buy a box worth ₱100+ = 1 stamp. 5 stamps = FREE small box of brownies (3 pcs).</p>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            {filteredLoyaltyCustomers.map((c) => {
+              const stamps = Math.min(5, Number(c.loyalty_stamps || 0));
+              const xs = [12.25, 27.34, 42.43, 57.47, 72.56];
+              const busy = updatingLoyaltyId === c.id;
+              return (
+                <div key={c.id} className="bg-bakery-ivory rounded-2xl border border-bakery-beige p-4 space-y-3 shadow-warm-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-display font-bold text-bakery-chocolate">{c.name}</h3>
+                      <span className="text-[10px] font-mono text-bakery-caramel">
+                        {c.loyalty_card_number} {c.phone ? `• ${c.phone}` : ''}
+                      </span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(c.loyalty_stamps || 0) >= 5 ? 'bg-emerald-600 text-white' : 'bg-bakery-cream text-bakery-chocolate border border-bakery-beige'}`}>
+                      {Number(c.loyalty_stamps || 0) >= 5 ? '🎁 Reward Ready' : `${Number(c.loyalty_stamps || 0)} / 5`}
+                    </span>
+                  </div>
+
+                  <div className="relative w-full rounded-xl overflow-hidden border border-bakery-beige cursor-pointer" onClick={() => setLoyaltyPreviewCustomer(c)}>
+                    <img src="/loyalty-card-bg.jpg" alt="CRAVEABLES Loyalty Card" className="w-full h-auto block" />
+                    {xs.map((x, idx) => {
+                      const filled = idx < stamps;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={busy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateLoyalty(c, 'set_stamps', filled && idx + 1 === stamps ? idx : idx + 1);
+                          }}
+                          className="absolute rounded-full overflow-hidden -translate-x-1/2 -translate-y-1/2"
+                          style={{ left: `${x}%`, top: '63.1%', width: '11%', aspectRatio: '1 / 1' }}
+                          title={`Set to ${idx + 1} stamp(s)`}
+                        >
+                          {filled && <img src="/logo.png" alt="stamp" className="w-full h-full object-cover rounded-full" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <button disabled={busy} onClick={() => handleUpdateLoyalty(c, 'remove_stamp')} className="px-2.5 py-1.5 rounded-lg bg-white border border-bakery-beige font-bold">-1 Stamp</button>
+                    <button disabled={busy} onClick={() => handleUpdateLoyalty(c, 'add_stamp')} className="px-2.5 py-1.5 rounded-lg bg-bakery-chocolate text-white font-bold">+1 Stamp</button>
+                    <button disabled={busy} onClick={() => openEditLoyaltyModal(c)} className="px-2.5 py-1.5 rounded-lg bg-white border border-bakery-beige font-bold flex items-center gap-1"><Edit3 className="w-3 h-3" />Edit</button>
+                    <button
+                      disabled={busy || Number(c.loyalty_stamps || 0) < 5}
+                      onClick={() => handleUpdateLoyalty(c, 'redeem_reward')}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold flex items-center gap-1 disabled:opacity-40"
+                    >
+                      <Gift className="w-3 h-3" />Claim Free Brownies
+                    </button>
+                    <a
+                      href={api.getCustomerLoyaltyCardImageUrl(c.id)}
+                      download={`CRAVEABLES-Loyalty-Card-${c.name}.png`}
+                      className="px-2.5 py-1.5 rounded-lg bg-bakery-cream border border-bakery-beige font-bold flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />Card (.png)
+                    </a>
+                  </div>
+                  <p className="text-[10px] text-bakery-muted">
+                    Qualifying orders: {c.qualifying_orders_count || 0} • Rewards claimed: {c.rewards_redeemed || 0}
+                  </p>
+                </div>
+              );
+            })}
+            {filteredLoyaltyCustomers.length === 0 && (
+              <p className="text-xs text-bakery-muted p-6">No loyalty cards match your filter.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Loyalty Card Image Preview */}
+      {loyaltyPreviewCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setLoyaltyPreviewCustomer(null)}>
+          <div className="bg-bakery-ivory rounded-3xl max-w-2xl w-full p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <img src={api.getCustomerLoyaltyCardImageUrl(loyaltyPreviewCustomer.id, true) + '&t=' + Date.now()} alt="Loyalty card" className="w-full rounded-xl border border-bakery-beige" />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setLoyaltyPreviewCustomer(null)} className="px-4 py-2 rounded-xl border border-bakery-beige text-xs font-semibold">Close</button>
+              <a
+                href={api.getCustomerLoyaltyCardImageUrl(loyaltyPreviewCustomer.id)}
+                download={`CRAVEABLES-Loyalty-Card-${loyaltyPreviewCustomer.name}.png`}
+                className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold"
+              >
+                Download Loyalty Card (.png)
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Loyalty Modal */}
+      {editingLoyaltyCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form onSubmit={handleSaveManualLoyalty} className="bg-bakery-ivory rounded-3xl max-w-sm w-full p-5 space-y-3 text-xs">
+            <h3 className="font-display font-bold text-base text-bakery-chocolate">Edit Loyalty Card — {editingLoyaltyCustomer.name}</h3>
+            <div>
+              <label className="block font-semibold mb-1">Current Stamps</label>
+              <input type="number" min="0" value={manualStampsInput} onChange={(e) => setManualStampsInput(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige" />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Free Brownie Rewards Claimed</label>
+              <input type="number" min="0" value={manualRewardsInput} onChange={(e) => setManualRewardsInput(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige" />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Notes</label>
+              <textarea rows={3} value={manualRewardNotes} onChange={(e) => setManualRewardNotes(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingLoyaltyCustomer(null)} className="px-4 py-2 rounded-xl border border-bakery-beige font-semibold">Cancel</button>
+              <button type="submit" className="px-4 py-2 rounded-xl bg-bakery-chocolate text-white font-bold">Save</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -2401,11 +2778,10 @@ export const OrdersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-bakery-chocolate mb-1">Phone Number *</label>
+                <label className="block font-semibold text-bakery-chocolate mb-1">Phone Number (optional)</label>
                 <input
                   type="text"
-                  required
-                  placeholder="0917-xxx-xxxx"
+                  placeholder="0917-xxx-xxxx (optional)"
                   value={custFormPhone}
                   onChange={(e) => setCustFormPhone(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
@@ -2705,11 +3081,10 @@ export const OrdersPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">Phone Number *</label>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">Phone Number (optional)</label>
                   <input
                     type="text"
-                    required
-                    placeholder="0917-xxx-xxxx"
+                    placeholder="0917-xxx-xxxx (optional)"
                     value={newCustPhone}
                     onChange={(e) => setNewCustPhone(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
@@ -2776,6 +3151,16 @@ export const OrdersPage: React.FC = () => {
                     onChange={(e) => setNewPaymentDueDate(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPaymentDueDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+                      setNewStatus('COMPLETED');
+                    }}
+                    className="mt-1.5 w-full px-2 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold hover:bg-amber-200"
+                  >
+                    +1 Week Due (Order Given / Pay Later)
+                  </button>
                 </div>
               </div>
 
@@ -3019,6 +3404,13 @@ export const OrdersPage: React.FC = () => {
                     onChange={(e) => setEditPaymentDueDate(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setEditPaymentDueDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0])}
+                    className="mt-1.5 w-full px-2 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold hover:bg-amber-200"
+                  >
+                    +1 Week Due Date
+                  </button>
                 </div>
               </div>
 

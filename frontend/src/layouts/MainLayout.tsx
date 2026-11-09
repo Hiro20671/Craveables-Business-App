@@ -20,7 +20,8 @@ import {
   Layers,
   Globe,
   Crown,
-  Package
+  Package,
+  Award
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { name: 'Customer Orders', to: '/orders', icon: ShoppingBag },
   { name: 'Whole Sales Order', to: '/wholesale-orders', icon: Layers },
+  { name: 'Loyalty Cards', to: '/loyalty-cards', icon: Award },
   { name: 'Inventory', to: '/inventory', icon: Boxes },
   { name: 'Ingredients', to: '/ingredients', icon: Wheat },
   { name: 'Recipe & Costing', to: '/costing', icon: Calculator },

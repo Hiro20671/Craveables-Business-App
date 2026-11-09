@@ -171,6 +171,10 @@ export const api = {
   updateCustomer: (id: number, data: any) =>
     request<any>(`/sales/customers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCustomer: (id: number) => request<void>(`/sales/customers/${id}/`, { method: 'DELETE' }),
+  updateCustomerLoyalty: (id: number, data: { action_type: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward'; stamps?: number; reward_notes?: string; rewards_redeemed?: number }) =>
+    request<any>(`/sales/customers/${id}/update-loyalty/`, { method: 'POST', body: JSON.stringify(data) }),
+  getCustomerLoyaltyCardImageUrl: (id: number, inline = false) =>
+    `${API_BASE}/sales/customers/${id}/loyalty-card-image/${inline ? '?inline=1' : ''}`,
 
   // Customer Payments & Accounts Receivable
   getPayments: (params?: { order?: number; customer?: number }) => {
@@ -208,6 +212,8 @@ export const api = {
     request<any>(`/sales/inquiries/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateInquiryStatus: (id: number, status: string) =>
     request<any>(`/sales/inquiries/${id}/update-status/`, { method: 'POST', body: JSON.stringify({ status }) }),
+  markOrderGivenWithDue: (id: number, data?: { days?: number; payment_due_date?: string; reset_unpaid?: boolean }) =>
+    request<any>(`/sales/inquiries/${id}/mark-given-due/`, { method: 'POST', body: JSON.stringify(data || { days: 7 }) }),
   convertInquiryToSale: (id: number, data?: any) =>
     request<any>(`/sales/inquiries/${id}/convert-to-sale/`, { method: 'POST', body: JSON.stringify(data || {}) }),
   deleteInquiry: (id: number) => request<void>(`/sales/inquiries/${id}/`, { method: 'DELETE' }),

@@ -62,11 +62,14 @@ class CustomerSerializer(serializers.ModelSerializer):
     total_ordered_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_paid_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_outstanding_balance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    qualifying_orders_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Customer
         fields = [
             'id', 'name', 'phone', 'email', 'address', 'notes',
+            'loyalty_card_number', 'loyalty_stamps', 'manual_stamp_adjustment',
+            'rewards_redeemed', 'reward_notes', 'qualifying_orders_count',
             'total_orders', 'total_ordered_amount', 'total_paid_amount',
             'total_outstanding_balance', 'created_at', 'updated_at'
         ]
