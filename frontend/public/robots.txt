@@ -27,3 +27,4 @@ Disallow: /reports
 Disallow: /settings
 
 Sitemap: https://jeremy2005.pythonanywhere.com/sitemap.xml
+

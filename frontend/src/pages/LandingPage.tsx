@@ -1085,7 +1085,7 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-bakery-caramel" />
-                  <span>Lucena City, Quezon (Local Delivery / Pickup)</span>
+                  <span>Purok St. Teresa, Mayao Parada, Lucena City, Quezon (Local Delivery / Pickup)</span>
                 </div>
               </div>
             </div>
@@ -1521,7 +1521,7 @@ export const LandingPage: React.FC = () => {
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-bakery-beige/60 gap-3">
             <p>&copy; {new Date().getFullYear()} CRAVEABLES. Made to Crave &bull; Baked with Love</p>
-            <p>Humble Small Home Bakery &bull; Lucena City, Quezon, Philippines</p>
+            <p>Humble Small Home Bakery &bull; Purok St. Teresa, Mayao Parada, Lucena City, Quezon Province</p>
           </div>
         </div>
       </footer>

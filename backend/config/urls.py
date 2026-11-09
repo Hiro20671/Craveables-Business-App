@@ -100,15 +100,15 @@ def serve_spa(request, resource=""):
     <meta name="theme-color" content="#3B170B" />
     <title>CRAVEABLES | Fresh Baked Treats in Lucena City • Banana Cake, Brownies &amp; Cookies</title>
     <meta name="title" content="CRAVEABLES | Fresh Baked Treats in Lucena City • Banana Cake, Brownies &amp; Cookies" />
-    <meta name="description" content="Small home bakery in Lucena City by Dyna, Jeremy &amp; Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies." />
-    <meta name="keywords" content="Craveables, Craveables Lucena, Craveables Bakery, Bakery in Lucena City, Banana Cake Lucena, Fudgy Brownies Lucena, Red Velvet Cookies Lucena, Lucena City Bakery, Lucena baked goods, Quezon home bakery, baked with love" />
+    <meta name="description" content="Small home bakery in Purok St. Teresa, Mayao Parada, Lucena City by Dyna, Jeremy &amp; Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies." />
+    <meta name="keywords" content="Craveables, Craveables Lucena, Craveables Bakery, Bakery in Lucena City, Mayao Parada bakery, Banana Cake Lucena, Fudgy Brownies Lucena, Red Velvet Cookies Lucena, Lucena City Bakery, Lucena baked goods, Quezon home bakery, baked with love" />
     <meta name="author" content="CRAVEABLES Lucena - Dyna, Jeremy &amp; Anne" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://jeremy2005.pythonanywhere.com/" />
     <meta name="geo.region" content="PH-QUE" />
-    <meta name="geo.placename" content="Lucena City, Quezon, Philippines" />
-    <meta name="geo.position" content="13.9314;121.6172" />
-    <meta name="ICBM" content="13.9314, 121.6172" />
+    <meta name="geo.placename" content="Purok St. Teresa, Mayao Parada, Lucena City, Quezon Province, Philippines" />
+    <meta name="geo.position" content="13.9486;121.6385" />
+    <meta name="ICBM" content="13.9486, 121.6385" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://jeremy2005.pythonanywhere.com/" />
     <meta property="og:title" content="CRAVEABLES | Fresh Baked Treats in Lucena City" />
@@ -144,19 +144,21 @@ def serve_spa(request, resource=""):
       "servesCuisine": "Filipino, Bakery, Pastries, Desserts",
       "address": {
         "@type": "PostalAddress",
+        "streetAddress": "Purok St. Teresa, Mayao Parada",
         "addressLocality": "Lucena City",
-        "addressRegion": "Quezon",
+        "addressRegion": "Quezon Province",
+        "postalCode": "4301",
         "addressCountry": "PH"
       },
       "geo": {
         "@type": "GeoCoordinates",
-        "latitude": 13.9314,
-        "longitude": 121.6172
+        "latitude": 13.9486,
+        "longitude": 121.6385
       },
-      "description": "Small home bakery in Lucena City started by three friends — Dyna, Jeremy, and Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies."
+      "description": "Small home bakery in Purok St. Teresa, Mayao Parada, Lucena City started by three friends — Dyna, Jeremy, and Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies."
     }
     </script>
-    <script type="module" crossorigin src="/assets/index-BLnCtZf0.js"></script>
+    <script type="module" crossorigin src="/assets/index-CDCMMTIy.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CT9PcKvw.css">
   </head>
   <body class="bg-[#FFF9DF] text-[#17110D]">
