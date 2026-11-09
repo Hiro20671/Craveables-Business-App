@@ -105,6 +105,7 @@ def serve_spa(request, resource=""):
     <meta name="author" content="CRAVEABLES Lucena - Dyna, Jeremy &amp; Anne" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://jeremy2005.pythonanywhere.com/" />
+    <meta name="google-site-verification" content="google65f93b7ed8cccdd0" />
     <meta name="geo.region" content="PH-QUE" />
     <meta name="geo.placename" content="Purok St. Teresa, Mayao Parada, Lucena City, Quezon Province, Philippines" />
     <meta name="geo.position" content="13.9486;121.6385" />
@@ -219,7 +220,12 @@ def serve_sitemap_xml(request):
     return HttpResponse(default_sitemap, content_type='application/xml; charset=utf-8')
 
 
+def serve_google_verification(request, filename='google65f93b7ed8cccdd0.html'):
+    return HttpResponse(f"google-site-verification: {filename}\n", content_type='text/html; charset=utf-8')
+
+
 urlpatterns = [
+    re_path(r'^(?P<filename>google[a-zA-Z0-9_-]+\.html)$', serve_google_verification),
     path('robots.txt', serve_robots_txt),
     path('sitemap.xml', serve_sitemap_xml),
     path('admin/', admin.site.urls),
