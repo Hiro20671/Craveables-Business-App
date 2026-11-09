@@ -60,8 +60,8 @@ mkdir -p frontend/dist/assets
 if [ ! -s "frontend/dist/assets/index-BLnCtZf0.js" ]; then
     curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-BLnCtZf0.js -o frontend/dist/assets/index-BLnCtZf0.js
 fi
-if [ ! -s "frontend/dist/assets/index-DX2HynaH.css" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DX2HynaH.css -o frontend/dist/assets/index-DX2HynaH.css
+if [ ! -s "frontend/dist/assets/index-CT9PcKvw.css" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-CT9PcKvw.css -o frontend/dist/assets/index-CT9PcKvw.css
 fi
 if [ ! -s "frontend/dist/index.html" ]; then
     curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/index.html -o frontend/dist/index.html
@@ -75,7 +75,7 @@ for item in "$REPO_DIR"/frontend/dist/*; do
 done
 
 echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-BLnCtZf0.js) bytes"
-echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-DX2HynaH.css) bytes"
+echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-CT9PcKvw.css) bytes"
 
 # 5. Locate & activate virtual environment
 echo "🐍 [4/6] Activating Python environment..."

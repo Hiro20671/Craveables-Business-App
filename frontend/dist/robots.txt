@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+Allow: /manifest.json
+Allow: /sitemap.xml
+Allow: /favicon.png
+Allow: /logo.png
+Allow: /poster-*.jpg
+
+# Disallow private management system and API endpoints from search index
+Disallow: /admin/
+Disallow: /api/
+Disallow: /portal
+Disallow: /login
+Disallow: /dashboard
+Disallow: /orders
+Disallow: /wholesale-orders
+Disallow: /loyalty-cards
+Disallow: /inventory
+Disallow: /ingredients
+Disallow: /costing
+Disallow: /production
+Disallow: /products
+Disallow: /sales
+Disallow: /expenses
+Disallow: /suppliers
+Disallow: /reports
+Disallow: /settings
+
+Sitemap: https://jeremy2005.pythonanywhere.com/sitemap.xml

@@ -48,6 +48,10 @@ def serve_spa(request, resource=""):
                     content_type = 'text/css'
                 elif file_path.suffix == '.json':
                     content_type = 'application/json'
+                elif file_path.suffix == '.txt':
+                    content_type = 'text/plain; charset=utf-8'
+                elif file_path.suffix == '.xml':
+                    content_type = 'application/xml; charset=utf-8'
                 elif file_path.suffix in ['.jpg', '.jpeg']:
                     content_type = 'image/jpeg'
                 elif file_path.suffix == '.png':
@@ -94,15 +98,77 @@ def serve_spa(request, resource=""):
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#3B170B" />
-    <meta name="description" content="CRAVEABLES Business Management System - Costing, Inventory, Production & Sales" />
+    <title>CRAVEABLES | Fresh Baked Treats in Lucena City • Banana Cake, Brownies &amp; Cookies</title>
+    <meta name="title" content="CRAVEABLES | Fresh Baked Treats in Lucena City • Banana Cake, Brownies &amp; Cookies" />
+    <meta name="description" content="Small home bakery in Lucena City by Dyna, Jeremy &amp; Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies." />
+    <meta name="keywords" content="Craveables, Craveables Lucena, Craveables Bakery, Bakery in Lucena City, Banana Cake Lucena, Fudgy Brownies Lucena, Red Velvet Cookies Lucena, Lucena City Bakery, Lucena baked goods, Quezon home bakery, baked with love" />
+    <meta name="author" content="CRAVEABLES Lucena - Dyna, Jeremy &amp; Anne" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://jeremy2005.pythonanywhere.com/" />
+    <meta name="geo.region" content="PH-QUE" />
+    <meta name="geo.placename" content="Lucena City, Quezon, Philippines" />
+    <meta name="geo.position" content="13.9314;121.6172" />
+    <meta name="ICBM" content="13.9314, 121.6172" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://jeremy2005.pythonanywhere.com/" />
+    <meta property="og:title" content="CRAVEABLES | Fresh Baked Treats in Lucena City" />
+    <meta property="og:description" content="Freshly baked Banana Cake, fudgy brownies, and chewy cookies baked in small batches with love by Dyna, Jeremy, and Anne in Lucena City." />
+    <meta property="og:image" content="https://jeremy2005.pythonanywhere.com/poster-classic-brownies.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CRAVEABLES Fresh Bakes Lucena City" />
+    <meta property="og:site_name" content="CRAVEABLES" />
+    <meta property="og:locale" content="en_PH" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://jeremy2005.pythonanywhere.com/" />
+    <meta name="twitter:title" content="CRAVEABLES | Fresh Baked Treats in Lucena City" />
+    <meta name="twitter:description" content="Fresh Banana Cake, Fudgy Brownies, and Chewy Cookies in Lucena City by Dyna, Jeremy &amp; Anne." />
+    <meta name="twitter:image" content="https://jeremy2005.pythonanywhere.com/poster-classic-brownies.jpg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <title>CRAVEABLES | Business Management System</title>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Bakery",
+      "name": "CRAVEABLES",
+      "alternateName": "CRAVEABLES Bakery Lucena",
+      "image": [
+        "https://jeremy2005.pythonanywhere.com/poster-classic-brownies.jpg",
+        "https://jeremy2005.pythonanywhere.com/poster-banana-cake.jpg",
+        "https://jeremy2005.pythonanywhere.com/logo.png"
+      ],
+      "logo": "https://jeremy2005.pythonanywhere.com/logo.png",
+      "url": "https://jeremy2005.pythonanywhere.com/",
+      "telephone": "+639157973701",
+      "priceRange": "₱30 - ₱220",
+      "servesCuisine": "Filipino, Bakery, Pastries, Desserts",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Lucena City",
+        "addressRegion": "Quezon",
+        "addressCountry": "PH"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 13.9314,
+        "longitude": 121.6172
+      },
+      "description": "Small home bakery in Lucena City started by three friends — Dyna, Jeremy, and Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies."
+    }
+    </script>
     <script type="module" crossorigin src="/assets/index-BLnCtZf0.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DX2HynaH.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CT9PcKvw.css">
   </head>
   <body class="bg-[#FFF9DF] text-[#17110D]">
-    <div id="root"></div>
+    <div id="root">
+      <noscript>
+        <div style="font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 20px; line-height: 1.6; color: #3B170B;">
+          <h1>CRAVEABLES — Freshly Baked Treats in Lucena City</h1>
+          <p><strong>Made to Crave • Baked with Love</strong></p>
+          <p>We are a small, humble home bakery in Lucena City started by three friends — Dyna, Jeremy, and Anne. Small-batch Lakatan Banana Cake, dense fudgy brownies, and chewy cookies.</p>
+        </div>
+      </noscript>
+    </div>
   </body>
 </html>"""
     response = HttpResponse(latest_html, content_type='text/html')
@@ -112,7 +178,48 @@ def serve_spa(request, resource=""):
     return response
 
 
+def serve_robots_txt(request):
+    root = Path(settings.BASE_DIR).parent
+    for candidate in [root / 'frontend' / 'dist' / 'robots.txt', root / 'frontend' / 'public' / 'robots.txt']:
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return HttpResponse(candidate.read_text(encoding='utf-8'), content_type='text/plain; charset=utf-8')
+    default_robots = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /manifest.json\n"
+        "Allow: /sitemap.xml\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        "Disallow: /portal\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /login\n\n"
+        "Sitemap: https://jeremy2005.pythonanywhere.com/sitemap.xml\n"
+    )
+    return HttpResponse(default_robots, content_type='text/plain; charset=utf-8')
+
+
+def serve_sitemap_xml(request):
+    root = Path(settings.BASE_DIR).parent
+    for candidate in [root / 'frontend' / 'dist' / 'sitemap.xml', root / 'frontend' / 'public' / 'sitemap.xml']:
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return HttpResponse(candidate.read_text(encoding='utf-8'), content_type='application/xml; charset=utf-8')
+    default_sitemap = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '  <url>\n'
+        '    <loc>https://jeremy2005.pythonanywhere.com/</loc>\n'
+        '    <lastmod>2026-11-09</lastmod>\n'
+        '    <changefreq>daily</changefreq>\n'
+        '    <priority>1.0</priority>\n'
+        '  </url>\n'
+        '</urlset>\n'
+    )
+    return HttpResponse(default_sitemap, content_type='application/xml; charset=utf-8')
+
+
 urlpatterns = [
+    path('robots.txt', serve_robots_txt),
+    path('sitemap.xml', serve_sitemap_xml),
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.accounts.urls')),
     path('api/suppliers/', include('apps.suppliers.urls')),

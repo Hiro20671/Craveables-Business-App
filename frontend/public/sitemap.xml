@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://jeremy2005.pythonanywhere.com/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://jeremy2005.pythonanywhere.com/poster-classic-brownies.jpg</image:loc>
+      <image:title>CRAVEABLES Classic Fudgy Brownies</image:title>
+      <image:caption>Rich and fudgy brownies baked in small batches in Lucena City</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://jeremy2005.pythonanywhere.com/poster-banana-cake.jpg</image:loc>
+      <image:title>CRAVEABLES Philippine Lakatan Banana Cake</image:title>
+      <image:caption>Naturally sweet banana cake made with ripe Philippine Lakatan bananas</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://jeremy2005.pythonanywhere.com/poster-red-velvet.jpg</image:loc>
+      <image:title>CRAVEABLES Red Velvet &amp; Choco Chip Cookies</image:title>
+      <image:caption>Chewy cookies baked with pure butter and premium chocolate in Lucena City</image:caption>
+    </image:image>
+  </url>
+</urlset>
