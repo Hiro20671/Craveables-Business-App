@@ -584,6 +584,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
         action_type = request.data.get('action_type', 'set_stamps')
         auto_stamps = customer.qualifying_orders_count - (customer.rewards_redeemed * 5)
 
+        if action_type in ('remove_card', 'restore_card'):
+            customer.loyalty_card_removed = (action_type == 'remove_card')
+            customer.save(update_fields=['loyalty_card_removed'])
+            return Response(CustomerSerializer(customer).data)
+
         if action_type == 'add_stamp':
             customer.manual_stamp_adjustment = (customer.manual_stamp_adjustment or 0) + 1
         elif action_type == 'remove_stamp':

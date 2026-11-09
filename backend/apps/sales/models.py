@@ -91,6 +91,7 @@ class Customer(models.Model):
     manual_stamp_adjustment = models.IntegerField(default=0, help_text="Manual stamp adjustment by admin")
     rewards_redeemed = models.PositiveIntegerField(default=0, help_text="Number of 5-stamp rewards claimed")
     reward_notes = models.TextField(blank=True, default='')
+    loyalty_card_removed = models.BooleanField(default=False, help_text="Admin removed this loyalty card (can be restored)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

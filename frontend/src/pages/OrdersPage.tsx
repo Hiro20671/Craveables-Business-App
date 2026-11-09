@@ -87,7 +87,8 @@ export const OrdersPage: React.FC = () => {
 
   // Loyalty Cards Management states
   const [loyaltySearch, setLoyaltySearch] = useState('');
-  const [loyaltyFilter, setLoyaltyFilter] = useState<'ALL' | 'READY' | 'ACTIVE' | 'ZERO'>('ALL');
+  const [loyaltyFilter, setLoyaltyFilter] = useState<'ALL' | 'READY' | 'ACTIVE' | 'ZERO' | 'REMOVED'>('ALL');
+  const [undoRemovedCard, setUndoRemovedCard] = useState<Customer | null>(null);
   const [updatingLoyaltyId, setUpdatingLoyaltyId] = useState<number | null>(null);
   const [loyaltyPreviewCustomer, setLoyaltyPreviewCustomer] = useState<Customer | null>(null);
   const [editingLoyaltyCustomer, setEditingLoyaltyCustomer] = useState<Customer | null>(null);
@@ -263,7 +264,7 @@ export const OrdersPage: React.FC = () => {
   // Loyalty Card Stamp & Reward Actions
   const handleUpdateLoyalty = async (
     cust: Customer,
-    actionType: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward',
+    actionType: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward' | 'remove_card' | 'restore_card',
     stamps?: number
   ) => {
     if (actionType === 'redeem_reward') {
@@ -277,6 +278,34 @@ export const OrdersPage: React.FC = () => {
       await fetchData();
     } catch (err: any) {
       alert(err.message || 'Failed to update loyalty card');
+    } finally {
+      setUpdatingLoyaltyId(null);
+    }
+  };
+
+  const handleRemoveCard = async (cust: Customer) => {
+    if (!window.confirm(`Remove ${cust.name}'s loyalty card? You can undo this right after, or restore it later from the "Removed" filter.`)) return;
+    try {
+      setUpdatingLoyaltyId(cust.id);
+      await api.updateCustomerLoyalty(cust.id, { action_type: 'remove_card' });
+      setUndoRemovedCard(cust);
+      setTimeout(() => setUndoRemovedCard((cur) => (cur && cur.id === cust.id ? null : cur)), 10000);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove loyalty card');
+    } finally {
+      setUpdatingLoyaltyId(null);
+    }
+  };
+
+  const handleRestoreCard = async (cust: Customer) => {
+    try {
+      setUpdatingLoyaltyId(cust.id);
+      await api.updateCustomerLoyalty(cust.id, { action_type: 'restore_card' });
+      setUndoRemovedCard(null);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to restore loyalty card');
     } finally {
       setUpdatingLoyaltyId(null);
     }
@@ -811,12 +840,14 @@ export const OrdersPage: React.FC = () => {
     });
 
   // Loyalty Cards Metrics & Filter (regular customers only — resellers excluded)
-  const loyaltyCustomers = customers.filter((c) => c.is_loyalty_eligible !== false);
+  const eligibleLoyaltyCustomers = customers.filter((c) => c.is_loyalty_eligible !== false);
+  const removedLoyaltyCount = eligibleLoyaltyCustomers.filter((c) => c.loyalty_card_removed).length;
+  const loyaltyCustomers = eligibleLoyaltyCustomers.filter((c) => !c.loyalty_card_removed);
   const totalStampsAwarded = loyaltyCustomers.reduce((s, c) => s + Number(c.loyalty_stamps || 0), 0);
   const readyForRewardCount = loyaltyCustomers.filter((c) => Number(c.loyalty_stamps || 0) >= 5).length;
   const totalRewardsRedeemed = loyaltyCustomers.reduce((s, c) => s + Number(c.rewards_redeemed || 0), 0);
 
-  const filteredLoyaltyCustomers = loyaltyCustomers
+  const filteredLoyaltyCustomers = (loyaltyFilter === 'REMOVED' ? eligibleLoyaltyCustomers.filter((c) => c.loyalty_card_removed) : loyaltyCustomers)
     .filter((c) => {
       const stamps = Number(c.loyalty_stamps || 0);
       if (loyaltyFilter === 'READY' && stamps < 5) return false;
@@ -1726,6 +1757,7 @@ export const OrdersPage: React.FC = () => {
               <option value="READY">Ready for reward (5+)</option>
               <option value="ACTIVE">Collecting (1-4)</option>
               <option value="ZERO">No stamps yet</option>
+              <option value="REMOVED">Removed cards ({removedLoyaltyCount})</option>
             </select>
             <p className="text-[11px] text-bakery-muted">Buy a box worth ₱100+ = 1 stamp. 5 stamps = FREE small box of brownies (3 pcs).</p>
           </div>
@@ -1790,6 +1822,15 @@ export const OrdersPage: React.FC = () => {
                     >
                       <Download className="w-3 h-3" />Card (.png)
                     </a>
+                    {c.loyalty_card_removed ? (
+                      <button disabled={busy} onClick={() => handleRestoreCard(c)} className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-bold flex items-center gap-1">
+                        <RotateCcw className="w-3 h-3" />Restore Card
+                      </button>
+                    ) : (
+                      <button disabled={busy} onClick={() => handleRemoveCard(c)} className="px-2.5 py-1.5 rounded-lg bg-white border border-red-300 text-red-600 font-bold flex items-center gap-1">
+                        <Trash2 className="w-3 h-3" />Remove Card
+                      </button>
+                    )}
                   </div>
                   <p className="text-[10px] text-bakery-muted">
                     Qualifying orders: {c.qualifying_orders_count || 0} • Rewards claimed: {c.rewards_redeemed || 0}
@@ -1801,6 +1842,14 @@ export const OrdersPage: React.FC = () => {
               <p className="text-xs text-bakery-muted p-6">No loyalty cards match your filter.</p>
             )}
           </div>
+        </div>
+      )}
+
+      {undoRemovedCard && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-bakery-chocolate text-white px-4 py-3 rounded-2xl shadow-warm-lg flex items-center gap-3 text-xs">
+          <span>Removed {undoRemovedCard.name}'s loyalty card.</span>
+          <button onClick={() => handleRestoreCard(undoRemovedCard)} className="px-3 py-1 rounded-lg bg-bakery-caramel font-bold">Undo</button>
+          <button onClick={() => setUndoRemovedCard(null)} className="text-bakery-cream/70">✕</button>
         </div>
       )}
 

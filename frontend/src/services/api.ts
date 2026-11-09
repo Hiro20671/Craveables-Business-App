@@ -171,7 +171,7 @@ export const api = {
   updateCustomer: (id: number, data: any) =>
     request<any>(`/sales/customers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCustomer: (id: number) => request<void>(`/sales/customers/${id}/`, { method: 'DELETE' }),
-  updateCustomerLoyalty: (id: number, data: { action_type: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward'; stamps?: number; reward_notes?: string; rewards_redeemed?: number }) =>
+  updateCustomerLoyalty: (id: number, data: { action_type: 'add_stamp' | 'remove_stamp' | 'set_stamps' | 'redeem_reward' | 'remove_card' | 'restore_card'; stamps?: number; reward_notes?: string; rewards_redeemed?: number }) =>
     request<any>(`/sales/customers/${id}/update-loyalty/`, { method: 'POST', body: JSON.stringify(data) }),
   getCustomerLoyaltyCardImageUrl: (id: number, inline = false) =>
     `${API_BASE}/sales/customers/${id}/loyalty-card-image/${inline ? '?inline=1' : ''}`,

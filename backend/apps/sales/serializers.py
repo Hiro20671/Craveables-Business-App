@@ -70,7 +70,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'phone', 'email', 'address', 'notes',
             'loyalty_card_number', 'loyalty_stamps', 'manual_stamp_adjustment',
-            'rewards_redeemed', 'reward_notes', 'qualifying_orders_count', 'is_loyalty_eligible',
+            'rewards_redeemed', 'reward_notes', 'qualifying_orders_count', 'is_loyalty_eligible', 'loyalty_card_removed',
             'total_orders', 'total_ordered_amount', 'total_paid_amount',
             'total_outstanding_balance', 'created_at', 'updated_at'
         ]
