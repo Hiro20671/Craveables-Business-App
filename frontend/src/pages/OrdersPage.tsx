@@ -810,12 +810,13 @@ export const OrdersPage: React.FC = () => {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-  // Loyalty Cards Metrics & Filter
-  const totalStampsAwarded = customers.reduce((s, c) => s + Number(c.loyalty_stamps || 0), 0);
-  const readyForRewardCount = customers.filter((c) => Number(c.loyalty_stamps || 0) >= 5).length;
-  const totalRewardsRedeemed = customers.reduce((s, c) => s + Number(c.rewards_redeemed || 0), 0);
+  // Loyalty Cards Metrics & Filter (regular customers only — resellers excluded)
+  const loyaltyCustomers = customers.filter((c) => c.is_loyalty_eligible !== false);
+  const totalStampsAwarded = loyaltyCustomers.reduce((s, c) => s + Number(c.loyalty_stamps || 0), 0);
+  const readyForRewardCount = loyaltyCustomers.filter((c) => Number(c.loyalty_stamps || 0) >= 5).length;
+  const totalRewardsRedeemed = loyaltyCustomers.reduce((s, c) => s + Number(c.rewards_redeemed || 0), 0);
 
-  const filteredLoyaltyCustomers = customers
+  const filteredLoyaltyCustomers = loyaltyCustomers
     .filter((c) => {
       const stamps = Number(c.loyalty_stamps || 0);
       if (loyaltyFilter === 'READY' && stamps < 5) return false;
@@ -1021,7 +1022,7 @@ export const OrdersPage: React.FC = () => {
               <Award className="w-3.5 h-3.5" />
               <span>Loyalty Cards</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-600 text-white">
-                {customers.length}
+                {customers.filter((c) => c.is_loyalty_eligible !== false).length}
               </span>
             </button>
 

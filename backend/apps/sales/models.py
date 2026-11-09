@@ -102,7 +102,20 @@ class Customer(models.Model):
 
     @property
     def qualifying_orders_count(self):
-        return self.orders.exclude(status='CANCELLED').filter(estimated_total__gte=Decimal('100.00')).count()
+        # Wholesale / reseller orders never earn loyalty stamps
+        return (
+            self.orders.exclude(status='CANCELLED')
+            .exclude(order_type='WHOLESALE')
+            .filter(estimated_total__gte=Decimal('100.00'))
+            .count()
+        )
+
+    @property
+    def is_loyalty_eligible(self):
+        """Reseller-only customers (wholesale orders, no regular orders) get no loyalty card."""
+        has_regular = self.orders.exclude(order_type='WHOLESALE').exists()
+        has_wholesale = self.orders.filter(order_type='WHOLESALE').exists()
+        return has_regular or not has_wholesale
 
     def recalculate_loyalty_stamps(self, save=True):
         if not self.loyalty_card_number and self.pk:

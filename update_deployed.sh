@@ -57,8 +57,8 @@ fi
 # 4. Verify frontend/dist bundle integrity & link zero-byte staticfiles
 echo "🎨 [3/6] Verifying production frontend bundle & linking static assets..."
 mkdir -p frontend/dist/assets
-if [ ! -s "frontend/dist/assets/index-DCWHiOGG.js" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DCWHiOGG.js -o frontend/dist/assets/index-DCWHiOGG.js
+if [ ! -s "frontend/dist/assets/index-q1DOndtA.js" ]; then
+    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-q1DOndtA.js -o frontend/dist/assets/index-q1DOndtA.js
 fi
 if [ ! -s "frontend/dist/assets/index-DX2HynaH.css" ]; then
     curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-DX2HynaH.css -o frontend/dist/assets/index-DX2HynaH.css
@@ -74,7 +74,7 @@ for item in "$REPO_DIR"/frontend/dist/*; do
     ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
 done
 
-echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-DCWHiOGG.js) bytes"
+echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-q1DOndtA.js) bytes"
 echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-DX2HynaH.css) bytes"
 
 # 5. Locate & activate virtual environment

@@ -321,6 +321,7 @@ export interface Customer {
   rewards_redeemed?: number;
   reward_notes?: string;
   qualifying_orders_count?: number;
+  is_loyalty_eligible?: boolean;
   total_orders: number;
   total_ordered_amount: number | string;
   total_paid_amount: number | string;
