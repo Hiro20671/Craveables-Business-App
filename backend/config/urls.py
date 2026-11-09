@@ -105,6 +105,7 @@ def serve_spa(request, resource=""):
     <meta name="author" content="CRAVEABLES Lucena - Dyna, Jeremy &amp; Anne" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://jeremy2005.pythonanywhere.com/" />
+    <meta name="google-site-verification" content="BgbcDgfnuC66Kq-9vmW_XweB6N7jB8Le856_27nO05c" />
     <meta name="google-site-verification" content="google65f93b7ed8cccdd0" />
     <meta name="google-site-verification" content="65f93b7ed8cccdd0" />
     <meta name="geo.region" content="PH-QUE" />
