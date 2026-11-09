@@ -106,6 +106,7 @@ def serve_spa(request, resource=""):
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://jeremy2005.pythonanywhere.com/" />
     <meta name="google-site-verification" content="google65f93b7ed8cccdd0" />
+    <meta name="google-site-verification" content="65f93b7ed8cccdd0" />
     <meta name="geo.region" content="PH-QUE" />
     <meta name="geo.placename" content="Purok St. Teresa, Mayao Parada, Lucena City, Quezon Province, Philippines" />
     <meta name="geo.position" content="13.9486;121.6385" />
