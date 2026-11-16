@@ -29,11 +29,58 @@ main() {
     REPO_DIR="$(pwd)"
     echo "📍 Working directory: $REPO_DIR"
 
-    # ---------------------------------------------------------------- 1. Backup
-    echo "🛡️ [1/6] Backing up the live database..."
+    # ---------------------------------------------------------------- 1. Backup & Rescue
+    echo "🛡️ [1/6] Checking & backing up the live database..."
     BACKUP_DIR="$HOME/craveables_db_backups"
     mkdir -p "$BACKUP_DIR"
     LIVE_DB="$REPO_DIR/backend/db.sqlite3"
+
+    # If /tmp/craveables_live_db.sqlite3 or ~/craveables_db_backups has more orders/sales than backend/db.sqlite3, rescue it automatically!
+    python3 - "$LIVE_DB" "$BACKUP_DIR" <<'PYRESCUE' 2>/dev/null || true
+import sys, os, glob, sqlite3, shutil
+
+live_db = sys.argv[1]
+backup_dir = sys.argv[2]
+
+def score_db(path):
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) < 100000:
+            return (-1, -1)
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        c = conn.cursor()
+        orders = c.execute("SELECT count(*) FROM sales_customerinquiry").fetchone()[0]
+        sales = float(c.execute("SELECT coalesce(sum(total_sales), 0) FROM sales_saleorder").fetchone()[0])
+        conn.close()
+        return (sales, orders)
+    except Exception:
+        return (-1, -1)
+
+best_path = live_db if os.path.exists(live_db) else None
+best_score = score_db(live_db) if best_path else (-1, -1)
+
+candidates = [
+    "/tmp/craveables_live_db.sqlite3",
+    "/var/tmp/craveables_live_db.sqlite3",
+] + glob.glob(os.path.join(backup_dir, "*.sqlite3"))
+
+for cand in candidates:
+    sc = score_db(cand)
+    if sc > best_score:
+        best_score = sc
+        best_path = cand
+
+if best_path and best_path != live_db:
+    shutil.copy2(best_path, live_db)
+    print(f"   ✔ Rescued full live database from {best_path} ({best_score[1]} orders, P{best_score[0]:,.2f} sales)!")
+PYRESCUE
+
+    # Also restore any media backup from /tmp/craveables_live_media if present
+    if [ -d "/tmp/craveables_live_media" ]; then
+        mkdir -p "$REPO_DIR/backend/media"
+        cp -rf /tmp/craveables_live_media/. "$REPO_DIR/backend/media/" 2>/dev/null || true
+        echo "   ✔ Restored uploaded media files from /tmp/craveables_live_media"
+    fi
+
     BACKUP_DB=""
     if [ -s "$LIVE_DB" ]; then
         BACKUP_DB="$BACKUP_DIR/craveables_db_$(date +%Y%m%d_%H%M%S).sqlite3"
@@ -41,7 +88,7 @@ main() {
             echo "❌ Could not back up the live database (disk quota?). Stopping - nothing was changed."
             exit 1
         fi
-        echo "   ✔ Backup saved: $BACKUP_DB"
+        echo "   ✔ Permanent backup saved: $BACKUP_DB"
     else
         echo "   ⚠ No live database found at $LIVE_DB"
     fi

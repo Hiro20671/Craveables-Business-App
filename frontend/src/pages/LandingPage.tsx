@@ -541,7 +541,10 @@ export const LandingPage: React.FC = () => {
             {/* Cart / Inquiry Tray Button */}
             {totalCartItems > 0 && (
               <button
-                onClick={() => setIsOrderModalOpen(true)}
+                onClick={() => {
+                  const elem = document.getElementById('how-to-order');
+                  if (elem) elem.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bakery-caramel text-white text-xs font-bold shadow-warm-sm hover:bg-[#966736] transition-transform active:scale-95 animate-bounce-subtle"
               >
                 <ShoppingBag className="w-4 h-4" />
@@ -820,13 +823,6 @@ export const LandingPage: React.FC = () => {
                     <Sparkles className="w-3 h-3 text-bakery-caramel shrink-0" />
                     <span className="truncate">{item.highlight}</span>
                   </div>
-
-                  {item.wholesaleTag && (
-                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-900 flex items-center gap-1.5">
-                      <span className="shrink-0 text-xs">🏷️</span>
-                      <span className="truncate">{item.wholesaleTag}</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -910,7 +906,10 @@ export const LandingPage: React.FC = () => {
                 Clear
               </button>
               <button
-                onClick={() => setIsOrderModalOpen(true)}
+                onClick={() => {
+                  const elem = document.getElementById('how-to-order');
+                  if (elem) elem.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="px-5 py-2.5 rounded-xl bg-bakery-caramel text-white text-xs font-bold hover:bg-[#966736] transition-transform active:scale-95 shadow-sm flex items-center gap-1.5"
               >
                 <span>Proceed to Order Slip</span>
@@ -1160,14 +1159,44 @@ export const LandingPage: React.FC = () => {
               {/* Selected items preview */}
               {totalCartItems > 0 ? (
                 <div className="p-3 rounded-2xl bg-white border border-bakery-beige space-y-1.5 text-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-bakery-muted">
-                    Your Selected Items:
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-bakery-muted">
+                      Your Selected Items:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOrderCart({})}
+                      className="text-[10px] font-semibold text-status-red hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                   <div className="divide-y divide-bakery-beige/60">
                     {Object.values(orderCart).map((item) => (
-                      <div key={item.name} className="py-1 flex justify-between">
-                        <span>{item.qty}x {item.name}</span>
-                        <span className="font-bold">₱{(item.qty * item.price).toFixed(2)}</span>
+                      <div key={item.name} className="py-1.5 flex items-center justify-between gap-2">
+                        <span className="font-semibold text-bakery-chocolate">{item.qty}x {item.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-bold text-bakery-caramel">₱{(item.qty * item.price).toFixed(2)}</span>
+                          <div className="flex items-center gap-1 bg-bakery-cream px-1.5 py-0.5 rounded-lg border border-bakery-beige">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromCart(item.name)}
+                              className="w-4 h-4 rounded bg-white text-bakery-chocolate flex items-center justify-center font-bold text-[10px]"
+                              title="Remove one"
+                            >
+                              <Minus className="w-2.5 h-2.5" />
+                            </button>
+                            <span className="font-bold text-[10px] px-0.5 text-bakery-chocolate">{item.qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleAddToCart(item.name, item.price)}
+                              className="w-4 h-4 rounded bg-bakery-chocolate text-white flex items-center justify-center font-bold text-[10px]"
+                              title="Add one more"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2124,12 +2153,13 @@ export const LandingPage: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSelectedPoster(null);
-                      setIsOrderModalOpen(true);
+                      const elem = document.getElementById('how-to-order');
+                      if (elem) elem.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="px-4 py-2.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] transition-transform active:scale-95 shadow-warm-xs flex items-center gap-1.5"
                   >
                     <Send className="w-3.5 h-3.5 text-bakery-caramel" />
-                    <span>View Order Slip</span>
+                    <span>Proceed to Order Slip</span>
                   </button>
                 </div>
               </div>
@@ -2138,22 +2168,20 @@ export const LandingPage: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Order Inquiry Modal */}
-      {isOrderModalOpen && (
+      {/* Order Submitted Confirmation Modal */}
+      {isOrderModalOpen && inquirySubmitted && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-bakery-ivory w-full max-w-lg rounded-3xl border border-bakery-beige shadow-warm-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 bg-bakery-chocolate text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-bakery-caramel" />
-                <h3 className="font-display font-bold text-base">Your CRAVEABLES Order Inquiry</h3>
+                <h3 className="font-display font-bold text-base">Order Submitted Successfully</h3>
               </div>
               <button
                 onClick={() => {
                   setIsOrderModalOpen(false);
-                  if (inquirySubmitted) {
-                    setInquirySubmitted(false);
-                    setOrderCart({});
-                  }
+                  setInquirySubmitted(false);
+                  setOrderCart({});
                 }}
                 className="text-bakery-beige/70 hover:text-white text-sm font-bold"
               >
@@ -2161,192 +2189,47 @@ export const LandingPage: React.FC = () => {
               </button>
             </div>
 
-            {inquirySubmitted ? (
-              <div className="p-8 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-status-greenLight text-status-green mx-auto flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-xl text-bakery-chocolate">
-                    Order Received!
-                  </h3>
-                  <p className="text-xs text-bakery-caramel font-semibold mt-1">
-                    Reference #{submittedInquiryNum}
-                  </p>
-                </div>
-                <div className="p-4 rounded-2xl bg-bakery-cream border border-bakery-beige text-xs text-bakery-espresso/80 text-left space-y-2">
-                  <p className="font-bold text-bakery-chocolate">Thank you, {customerName}!</p>
-                  <p>Your order inquiry has been received directly on our live bakery management dashboard.</p>
-                  <p className="text-bakery-muted text-[11px]">
-                    Dyna, Jeremy, or Anne will reach out to you via <strong>{customerPhone}</strong> shortly to confirm your baking schedule and payment details.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyOrder}
-                    className="px-4 py-2.5 rounded-xl bg-bakery-caramel text-white text-xs font-bold hover:bg-[#966736] transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    {orderCopied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                    <span>{orderCopied ? 'Slip Copied!' : 'Copy Order Slip to Clipboard'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOrderModalOpen(false);
-                      setInquirySubmitted(false);
-                      setOrderCart({});
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] transition-colors"
-                  >
-                    Back to Storefront
-                  </button>
-                </div>
+            <div className="p-8 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-status-greenLight text-status-green mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10" />
               </div>
-            ) : (
-              <>
-                <div className="p-6 overflow-y-auto space-y-4 text-xs">
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-bakery-chocolate uppercase tracking-wider text-[10px]">
-                      Selected Treats:
-                    </h4>
-                    {Object.keys(orderCart).length === 0 ? (
-                      <p className="text-bakery-muted italic text-center py-4">
-                        Your tray is currently empty. Pick delicious treats from the menu above!
-                      </p>
-                    ) : (
-                      <div className="divide-y divide-bakery-beige/60 border border-bakery-beige rounded-2xl p-3 bg-white">
-                        {cartCalculations.map((item) => (
-                          <div key={item.name} className="py-2 flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-semibold text-bakery-chocolate">{item.name}</p>
-                                {item.tierBadge && (
-                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
-                                    {item.tierBadge}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-bakery-muted">
-                                ₱{item.price} x {item.qty}
-                                {item.totalDiscount > 0 && (
-                                  <span className="text-emerald-600 ml-1 font-semibold">
-                                    (Save ₱{item.totalDiscount.toFixed(2)})
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-display font-bold text-bakery-caramel">
-                                ₱{item.discountedTotal.toFixed(2)}
-                              </span>
-                              <button
-                                onClick={() => handleRemoveFromCart(item.name)}
-                                className="text-status-red hover:underline text-[10px]"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        {totalCartDiscount > 0 && (
-                          <div className="pt-2 border-t border-bakery-beige/60 space-y-1">
-                            <div className="flex justify-between text-bakery-muted text-xs">
-                              <span>Regular Subtotal:</span>
-                              <span>₱{rawCartAmount.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-emerald-600 font-bold text-xs">
-                              <span>🎉 Wholesale Discount:</span>
-                              <span>-₱{totalCartDiscount.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="pt-2 flex justify-between font-bold text-bakery-chocolate text-sm">
-                          <span>Estimated Total:</span>
-                          <span className="font-display text-bakery-caramel">₱{totalCartAmount.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <div>
-                      <label className="block font-semibold text-bakery-chocolate mb-1">Your Full Name *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Enter your name"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-semibold text-bakery-chocolate mb-1">Mobile / Contact *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="0917-xxx-xxxx"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-bakery-chocolate mb-1">Target Date</label>
-                        <input
-                          type="date"
-                          value={deliveryDate}
-                          onChange={(e) => setDeliveryDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs focus:outline-hidden"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-bakery-chocolate mb-1">Special Notes</label>
-                      <textarea
-                        rows={2}
-                        placeholder="Any special requests or instructions..."
-                        value={orderNotes}
-                        onChange={(e) => setOrderNotes(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs resize-none focus:outline-hidden"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-bakery-cream border-t border-bakery-beige flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsOrderModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-beige/50"
-                  >
-                    Cancel
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyOrder}
-                      disabled={totalCartItems === 0}
-                      className="px-3 py-2 rounded-xl bg-white border border-bakery-beige text-bakery-chocolate text-xs font-semibold hover:bg-bakery-cream transition-colors disabled:opacity-50"
-                    >
-                      {orderCopied ? 'Slip Copied!' : 'Copy Slip'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSubmitInquiry}
-                      disabled={totalCartItems === 0 || submittingInquiry}
-                      className="px-5 py-2 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-warm-xs"
-                    >
-                      <Send className="w-4 h-4 text-bakery-caramel" />
-                      <span>{submittingInquiry ? 'Sending...' : 'Submit Order Inquiry'}</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+              <div>
+                <h3 className="font-display font-bold text-xl text-bakery-chocolate">
+                  Order Received!
+                </h3>
+                <p className="text-xs text-bakery-caramel font-semibold mt-1">
+                  Reference #{submittedInquiryNum}
+                </p>
+              </div>
+              <div className="p-4 rounded-2xl bg-bakery-cream border border-bakery-beige text-xs text-bakery-espresso/80 text-left space-y-2">
+                <p className="font-bold text-bakery-chocolate">Thank you, {customerName}!</p>
+                <p>Your order inquiry has been received directly on our live bakery management dashboard.</p>
+                <p className="text-bakery-muted text-[11px]">
+                  Dyna, Jeremy, or Anne will reach out to you via <strong>{customerPhone}</strong> shortly to confirm your baking schedule and payment details.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={handleCopyOrder}
+                  className="px-4 py-2.5 rounded-xl bg-bakery-caramel text-white text-xs font-bold hover:bg-[#966736] transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {orderCopied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                  <span>{orderCopied ? 'Slip Copied!' : 'Copy Order Slip to Clipboard'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOrderModalOpen(false);
+                    setInquirySubmitted(false);
+                    setOrderCart({});
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108] transition-colors"
+                >
+                  Back to Storefront
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
