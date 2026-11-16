@@ -1,127 +1,137 @@
 #!/bin/bash
-set -e
+# ==============================================================================
+# CRAVEABLES - Safe Code & UI Update for PythonAnywhere
+#
+# Run it from OUTSIDE the repo so git can't rewrite the script while it runs:
+#   cd ~/Craveables-Business-App && git fetch origin main \
+#     && git show origin/main:update_deployed.sh > ~/update_deployed.sh \
+#     && bash ~/update_deployed.sh
+#
+# Data safety rules:
+#   1. The live database is copied to ~/craveables_db_backups/ (permanent, not /tmp)
+#      BEFORE any git command runs.
+#   2. backend/media and backend/db.sqlite3 are excluded from `git clean`.
+#   3. The live database is ALWAYS copied back after the git reset, even if a
+#      later step fails (EXIT trap).
+# Everything is wrapped in main() so bash reads the whole script before running it.
+# ==============================================================================
 
-echo "=========================================================="
-echo "🧁 CRAVEABLES - Safe Code & UI Update (Preserves Live Data 100%)"
-echo "=========================================================="
+main() {
+    echo "=========================================================="
+    echo "🧁 CRAVEABLES - Safe Code & UI Update (Preserves Live Data)"
+    echo "=========================================================="
 
-# 1. Navigate to repository root
-if [ -d "$HOME/Craveables-Business-App" ]; then
-    cd "$HOME/Craveables-Business-App"
-elif [ -d "Craveables-Business-App" ]; then
-    cd "Craveables-Business-App"
-fi
-
-REPO_DIR="$(pwd)"
-echo "📍 Working directory: $REPO_DIR"
-
-# 2. Free disk space & BACK UP live database + uploaded media BEFORE git reset!
-echo "🛡️ [1/6] Backing up live database & media so ZERO live records are touched..."
-rm -rf ~/.cache/* ~/.npm/* ~/.local/share/Trash/* 2>/dev/null || true
-rm -rf frontend/node_modules node_modules 2>/dev/null || true
-rm -rf backend/staticfiles database_backup.json backend/craveables_backup.json 2>/dev/null || true
-find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-find . -type f -name "*.pyc" -delete 2>/dev/null || true
-
-if [ -s "backend/db.sqlite3" ]; then
-    mkdir -p "$HOME/craveables_db_backups" 2>/dev/null || true
-    cp -f backend/db.sqlite3 "$HOME/craveables_db_backups/craveables_db_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
-    cp -f backend/db.sqlite3 /tmp/craveables_live_db.sqlite3
-    echo "   ✔ Protected live database (backend/db.sqlite3 + permanent backup saved in ~/craveables_db_backups/)"
-fi
-if [ -d "backend/media" ]; then
-    rm -rf /tmp/craveables_live_media 2>/dev/null || true
-    cp -rf backend/media /tmp/craveables_live_media
-    echo "   ✔ Protected uploaded photos & videos (backend/media)"
-fi
-
-# 3. Pull latest code & frontend build from GitHub
-echo "📥 [2/6] Pulling latest code and frontend bundle from GitHub..."
-git fetch --depth=1 origin main
-git reset --hard origin/main
-git clean -fd
-git reflog expire --expire=now --all 2>/dev/null || true
-git gc --prune=now 2>/dev/null || true
-
-# IMMEDIATELY restore the live database and media so git reset NEVER overwrites user records!
-if [ -s "/tmp/craveables_live_db.sqlite3" ]; then
-    cp -f /tmp/craveables_live_db.sqlite3 backend/db.sqlite3
-    rm -f /tmp/craveables_live_db.sqlite3
-    echo "   ✔ Restored your exact live database untouched!"
-fi
-if [ -d "/tmp/craveables_live_media" ]; then
-    mkdir -p backend/media
-    cp -rf /tmp/craveables_live_media/* backend/media/ 2>/dev/null || true
-    rm -rf /tmp/craveables_live_media
-    echo "   ✔ Restored your uploaded photos & videos untouched!"
-fi
-
-# 4. Verify frontend/dist bundle integrity & link zero-byte staticfiles
-echo "🎨 [3/6] Verifying production frontend bundle & linking static assets..."
-mkdir -p frontend/dist/assets
-LATEST_JS=$(ls frontend/dist/assets/index-*.js 2>/dev/null | head -n 1 || true)
-LATEST_CSS=$(ls frontend/dist/assets/index-*.css 2>/dev/null | head -n 1 || true)
-
-# Create zero-byte symlinks in backend/staticfiles so Nginx /static/ mapping uses 0 MB disk quota
-rm -rf backend/staticfiles
-mkdir -p backend/staticfiles
-for item in "$REPO_DIR"/frontend/dist/*; do
-    ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
-done
-
-if [ -n "$LATEST_JS" ]; then
-    echo "   ✔ JS Bundle: $LATEST_JS ($(wc -c < "$LATEST_JS") bytes)"
-fi
-if [ -n "$LATEST_CSS" ]; then
-    echo "   ✔ CSS Bundle: $LATEST_CSS ($(wc -c < "$LATEST_CSS") bytes)"
-fi
-
-# 5. Locate & activate virtual environment
-echo "🐍 [4/6] Activating Python environment..."
-if [ -f "backend/venv/bin/activate" ]; then
-    source backend/venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
-elif [ -f "$HOME/.virtualenvs/craveables/bin/activate" ]; then
-    source "$HOME/.virtualenvs/craveables/bin/activate"
-elif [ -d "$HOME/.virtualenvs" ]; then
-    FIRST_VENV=$(find "$HOME/.virtualenvs" -maxdepth 2 -name "activate" | head -n 1)
-    if [ -n "$FIRST_VENV" ]; then
-        source "$FIRST_VENV"
+    if [ -d "$HOME/Craveables-Business-App" ]; then
+        cd "$HOME/Craveables-Business-App" || exit 1
+    elif [ -d "Craveables-Business-App" ]; then
+        cd "Craveables-Business-App" || exit 1
     fi
-fi
+    REPO_DIR="$(pwd)"
+    echo "📍 Working directory: $REPO_DIR"
 
-# Only install packages if missing to save disk quota
-python -c "import django, rest_framework, corsheaders, whitenoise, reportlab, PIL" 2>/dev/null || \
-    pip install --no-cache-dir -r backend/requirements.txt reportlab pillow --quiet || true
-
-# 6. Run schema migrations ONLY (never overwrite existing live data!)
-echo "🗄️ [5/6] Applying schema migrations while keeping all your live orders & records untouched..."
-python backend/manage.py migrate
-
-# Sync inquiries -> customers/loyalty cards & update official business address
-python -c "
-import os, sys, django
-sys.path.insert(0, 'backend')
-os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings'
-django.setup()
-from apps.sales.models import sync_all_inquiries_to_sales
-from apps.settings_app.models import BusinessSettings
-sync_all_inquiries_to_sales()
-BusinessSettings.objects.update(address='Purok St. Teresa, Mayao Parada, Lucena City, Quezon Province')
-" 2>/dev/null || true
-
-# 7. Reload PythonAnywhere Web App automatically
-echo "🔄 [6/6] Reloading PythonAnywhere web application..."
-for wsgi_file in /var/www/*_wsgi.py; do
-    if [ -f "$wsgi_file" ]; then
-        touch "$wsgi_file"
-        echo "   ✔ Touched $wsgi_file"
+    # ---------------------------------------------------------------- 1. Backup
+    echo "🛡️ [1/6] Backing up the live database..."
+    BACKUP_DIR="$HOME/craveables_db_backups"
+    mkdir -p "$BACKUP_DIR"
+    LIVE_DB="$REPO_DIR/backend/db.sqlite3"
+    BACKUP_DB=""
+    if [ -s "$LIVE_DB" ]; then
+        BACKUP_DB="$BACKUP_DIR/craveables_db_$(date +%Y%m%d_%H%M%S).sqlite3"
+        if ! cp -f "$LIVE_DB" "$BACKUP_DB" || ! cmp -s "$LIVE_DB" "$BACKUP_DB"; then
+            echo "❌ Could not back up the live database (disk quota?). Stopping - nothing was changed."
+            exit 1
+        fi
+        echo "   ✔ Backup saved: $BACKUP_DB"
+    else
+        echo "   ⚠ No live database found at $LIVE_DB"
     fi
-done
 
-echo ""
-echo "=========================================================="
-echo "🎉 SUCCESS! Code & UI updated while 100% preserving your live data!"
-echo "   👉 Open https://jeremy2005.pythonanywhere.com and press Ctrl + Shift + R"
-echo "=========================================================="
+    # Always put the live database back when the script exits, even on errors.
+    restore_db() {
+        if [ -n "$BACKUP_DB" ] && [ -s "$BACKUP_DB" ]; then
+            if ! cmp -s "$BACKUP_DB" "$LIVE_DB" 2>/dev/null; then
+                cp -f "$BACKUP_DB" "$LIVE_DB" && echo "   ✔ Live database restored from $BACKUP_DB"
+            fi
+        fi
+    }
+    trap restore_db EXIT
+
+    # Free disk space (never touches the database or media)
+    rm -rf ~/.cache/* ~/.npm/* ~/.local/share/Trash/* 2>/dev/null || true
+    rm -rf frontend/node_modules node_modules backend/staticfiles 2>/dev/null || true
+    find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+
+    # ------------------------------------------------------------ 2. Pull code
+    echo "📥 [2/6] Pulling latest code and frontend bundle from GitHub..."
+    if ! git fetch --depth=1 origin main; then
+        echo "❌ git fetch failed. Your data is untouched."
+        exit 1
+    fi
+    git reset --hard origin/main || { echo "❌ git reset failed."; exit 1; }
+    git clean -fd -e backend/media -e backend/db.sqlite3 -e 'backend/db.sqlite3-*' -e '.nfs*' 2>/dev/null || true
+
+    # Put the live database back immediately after the reset.
+    restore_db
+    if [ -n "$BACKUP_DB" ] && ! cmp -s "$BACKUP_DB" "$LIVE_DB"; then
+        echo "❌ Live database could not be restored automatically."
+        echo "   Restore it manually with: cp '$BACKUP_DB' '$LIVE_DB'"
+        exit 1
+    fi
+    echo "   ✔ Live database is in place"
+
+    # ----------------------------------------------------- 3. Static assets
+    echo "🎨 [3/6] Linking frontend bundle..."
+    mkdir -p backend/staticfiles
+    for item in "$REPO_DIR"/frontend/dist/*; do
+        ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
+    done
+    LATEST_JS=$(ls frontend/dist/assets/index-*.js 2>/dev/null | head -n 1)
+    [ -n "$LATEST_JS" ] && echo "   ✔ JS Bundle: $LATEST_JS"
+
+    # ----------------------------------------------------------- 4. Python env
+    echo "🐍 [4/6] Activating Python environment..."
+    if [ -f "backend/venv/bin/activate" ]; then
+        source backend/venv/bin/activate
+    elif [ -f "venv/bin/activate" ]; then
+        source venv/bin/activate
+    elif [ -f "$HOME/.virtualenvs/craveables/bin/activate" ]; then
+        source "$HOME/.virtualenvs/craveables/bin/activate"
+    elif [ -d "$HOME/.virtualenvs" ]; then
+        FIRST_VENV=$(find "$HOME/.virtualenvs" -maxdepth 2 -name "activate" | head -n 1)
+        [ -n "$FIRST_VENV" ] && source "$FIRST_VENV"
+    fi
+    python -c "import django, rest_framework, corsheaders, whitenoise, reportlab, PIL" 2>/dev/null || \
+        pip install --no-cache-dir -r backend/requirements.txt reportlab pillow --quiet || true
+
+    # ------------------------------------------------------------ 5. Migrate
+    echo "🗄️ [5/6] Applying schema migrations (adds new columns only, keeps all records)..."
+    if ! python backend/manage.py migrate; then
+        echo "❌ Migration failed. Your data backup is at: $BACKUP_DB"
+        exit 1
+    fi
+
+    python - <<'PYEOF' 2>/dev/null || true
+import sqlite3
+c = sqlite3.connect("backend/db.sqlite3")
+orders = c.execute("SELECT count(*) FROM sales_customerinquiry").fetchone()[0]
+sales = c.execute("SELECT coalesce(sum(total_sales),0) FROM sales_saleorder").fetchone()[0]
+print(f"   ✔ Live data check: {orders} orders, P{sales} total sales")
+PYEOF
+
+    # ------------------------------------------------------------- 6. Reload
+    echo "🔄 [6/6] Reloading PythonAnywhere web application..."
+    for wsgi_file in /var/www/*_wsgi.py; do
+        [ -f "$wsgi_file" ] && touch "$wsgi_file" && echo "   ✔ Touched $wsgi_file"
+    done
+
+    # Keep only the 15 newest backups to stay inside the disk quota
+    ls -1t "$BACKUP_DIR"/craveables_db_*.sqlite3 2>/dev/null | tail -n +16 | xargs -r rm -f
+
+    echo ""
+    echo "=========================================================="
+    echo "🎉 Done. Open https://jeremy2005.pythonanywhere.com and press Ctrl + Shift + R"
+    echo "=========================================================="
+}
+
+main "$@"
+exit $?

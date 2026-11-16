@@ -45,3 +45,9 @@ CRAVEABLES_OFFICIAL_LOGO.jpg
 Thumbs.db
 *.swp
 *.bak
+
+# Live database must never be in git (PythonAnywhere keeps its own)
+backend/db.sqlite3
+backend/db.sqlite3-*
+backend/media/payment_proofs/
+backend/media/featured_orders/
