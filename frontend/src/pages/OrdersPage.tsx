@@ -83,7 +83,7 @@ export const OrdersPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | OrderWorkflowStatus>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'UNPAID' | 'GIVEN_DUE' | 'PAID'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'TARGET_DATE' | 'NEWEST'>('TARGET_DATE');
+  const [sortBy, setSortBy] = useState<'TARGET_DATE' | 'NEWEST'>('NEWEST');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   // Loyalty Cards Management states

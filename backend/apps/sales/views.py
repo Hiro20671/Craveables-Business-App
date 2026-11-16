@@ -552,6 +552,42 @@ class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('name')
     serializer_class = CustomerSerializer
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='lookup-customer')
+    def lookup_customer(self, request):
+        name = request.query_params.get('name', '').strip()
+        phone = request.query_params.get('phone', '').strip()
+
+        if not name and not phone:
+            return Response({'found': False})
+
+        cust = None
+        if phone:
+            clean_digits = ''.join(c for c in phone if c.isdigit())
+            if len(clean_digits) >= 7:
+                cust = Customer.objects.filter(phone__icontains=clean_digits[-7:]).first()
+
+        if not cust and name and len(name) >= 3 and name.lower() != 'customer':
+            cust = Customer.objects.filter(name__iexact=name).first()
+            if not cust:
+                cust = Customer.objects.filter(name__istartswith=name).first()
+
+        if cust:
+            stamps = cust.recalculate_loyalty_stamps(save=True)
+            return Response({
+                'found': True,
+                'id': cust.id,
+                'customer_name': cust.name,
+                'customer_phone': cust.phone,
+                'delivery_address': cust.address,
+                'loyalty_card_number': cust.loyalty_card_number or f"CRV-LOY-{cust.id:04d}",
+                'loyalty_stamps': stamps,
+                'qualifying_orders_count': cust.qualifying_orders_count,
+                'total_orders': cust.total_orders,
+            })
+
+        return Response({'found': False})
 
     def get_queryset(self):
         sync_all_inquiries_to_sales()

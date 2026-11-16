@@ -24,8 +24,10 @@ find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
 if [ -s "backend/db.sqlite3" ]; then
+    mkdir -p "$HOME/craveables_db_backups" 2>/dev/null || true
+    cp -f backend/db.sqlite3 "$HOME/craveables_db_backups/craveables_db_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
     cp -f backend/db.sqlite3 /tmp/craveables_live_db.sqlite3
-    echo "   ✔ Protected live database (backend/db.sqlite3)"
+    echo "   ✔ Protected live database (backend/db.sqlite3 + permanent backup saved in ~/craveables_db_backups/)"
 fi
 if [ -d "backend/media" ]; then
     rm -rf /tmp/craveables_live_media 2>/dev/null || true
