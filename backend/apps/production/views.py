@@ -97,6 +97,20 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
         est_total_cost = est_ing_cost + est_overhead
         cost_per_unit = round(est_total_cost / max(1, planned_yield), 2)
 
+        packaging_requirements = []
+        for rp in recipe.recipe_packagings.all():
+            pkg = rp.packaging_item
+            req_pkg = round(Decimal(str(rp.quantity_needed)) * batches, 2)
+            has_enough_pkg = pkg.current_stock >= req_pkg
+            packaging_requirements.append({
+                'packaging_id': pkg.id,
+                'packaging_name': pkg.name,
+                'required_quantity': float(req_pkg),
+                'current_stock': float(pkg.current_stock),
+                'has_enough': has_enough_pkg,
+                'cost_per_unit': float(pkg.cost_per_unit),
+            })
+
         return Response({
             'recipe_id': recipe.id,
             'recipe_name': recipe.name,
@@ -105,6 +119,7 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
             'is_sufficient': is_sufficient,
             'is_customized': bool(custom_ingredients),
             'requirements': requirements,
+            'packaging_requirements': packaging_requirements,
             'estimated_ingredient_cost': round(est_ing_cost, 2),
             'estimated_overhead_cost': round(est_overhead, 2),
             'estimated_total_cost': round(est_total_cost, 2),
@@ -243,6 +258,12 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
             order.completed_at = timezone.now()
             variant.current_finished_stock += actual_yield
             variant.save()
+            # Deduct packaging supplies
+            for rp in recipe.recipe_packagings.all():
+                needed_pkg = Decimal(str(rp.quantity_needed)) * batches
+                pkg = rp.packaging_item
+                pkg.current_stock = max(Decimal('0'), pkg.current_stock - needed_pkg)
+                pkg.save()
 
         order.save()
 
@@ -418,6 +439,13 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
         variant.current_finished_stock += actual_yield
         variant.save()
 
+        # Deduct packaging supplies
+        for rp in recipe.recipe_packagings.all():
+            needed_pkg = Decimal(str(rp.quantity_needed)) * batches
+            pkg = rp.packaging_item
+            pkg.current_stock = max(Decimal('0'), pkg.current_stock - needed_pkg)
+            pkg.save()
+
         return Response(self.get_serializer(order).data)
 
     @action(detail=True, methods=['post'], url_path='undo')
@@ -450,6 +478,13 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
         variant.current_finished_stock = max(0, variant.current_finished_stock - order.actual_yield)
         variant.save()
 
+        # 3. Restore packaging supplies
+        for rp in order.recipe.recipe_packagings.all():
+            needed_pkg = Decimal(str(rp.quantity_needed)) * Decimal(str(order.batches_count))
+            pkg = rp.packaging_item
+            pkg.current_stock += needed_pkg
+            pkg.save()
+
         # 3. Mark status as CANCELLED
         order.status = ProductionStatus.CANCELLED
         order.notes = f"{order.notes} [UNDONE on {timezone.now().strftime('%Y-%m-%d %H:%M')}]".strip()
@@ -460,8 +495,14 @@ class ProductionOrderViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         order = self.get_object()
-        # If completed, restore ingredients and revert finished goods
+        # If completed, restore ingredients, packaging, and revert finished goods
         if order.status == ProductionStatus.COMPLETED:
+            for rp in order.recipe.recipe_packagings.all():
+                needed_pkg = Decimal(str(rp.quantity_needed)) * Decimal(str(order.batches_count))
+                pkg = rp.packaging_item
+                pkg.current_stock += needed_pkg
+                pkg.save()
+
             for usage in order.ingredient_usages.all():
                 ing = usage.ingredient
                 prev_stock = ing.current_stock

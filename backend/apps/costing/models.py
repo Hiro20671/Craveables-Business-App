@@ -9,6 +9,8 @@ class PackagingItem(models.Model):
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00, help_text="Units in pack")
     cost_per_unit = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000)
     default_needed_per_batch = models.DecimalField(max_digits=8, decimal_places=2, default=1.00)
+    current_stock = models.DecimalField(max_digits=10, decimal_places=2, default=100.00, help_text="Units in stock")
+    reorder_level = models.DecimalField(max_digits=10, decimal_places=2, default=20.00, help_text="Minimum alert level")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -20,8 +22,12 @@ class PackagingItem(models.Model):
     def cost_per_need(self):
         return round(self.cost_per_unit * Decimal(str(self.default_needed_per_batch)), 4)
 
+    @property
+    def is_low_stock(self):
+        return self.current_stock <= self.reorder_level
+
     def __str__(self):
-        return f"{self.name} (₱{self.cost_per_unit:.4f}/unit)"
+        return f"{self.name} (₱{self.cost_per_unit:.4f}/unit, Stock: {self.current_stock})"
 
 class Recipe(models.Model):
     product_variant = models.OneToOneField(ProductVariant, on_delete=models.CASCADE, related_name='recipe')

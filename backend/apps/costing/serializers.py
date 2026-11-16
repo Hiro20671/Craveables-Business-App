@@ -3,10 +3,15 @@ from .models import PackagingItem, Recipe, RecipeIngredient, RecipePackaging
 
 class PackagingItemSerializer(serializers.ModelSerializer):
     cost_per_need = serializers.DecimalField(max_digits=10, decimal_places=4, read_only=True)
+    is_low_stock = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PackagingItem
-        fields = ['id', 'name', 'cost', 'quantity', 'cost_per_unit', 'default_needed_per_batch', 'cost_per_need', 'created_at']
+        fields = [
+            'id', 'name', 'cost', 'quantity', 'cost_per_unit',
+            'default_needed_per_batch', 'cost_per_need', 'current_stock',
+            'reorder_level', 'is_low_stock', 'created_at'
+        ]
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)

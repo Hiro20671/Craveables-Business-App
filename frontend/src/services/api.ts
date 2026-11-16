@@ -110,6 +110,16 @@ export const api = {
   createPackagingItem: (data: any) => request<any>('/costing/packaging-items/', { method: 'POST', body: JSON.stringify(data) }),
   updatePackagingItem: (id: number, data: any) => request<any>(`/costing/packaging-items/${id}/`, { method: 'PUT', body: JSON.stringify(data) }),
   deletePackagingItem: (id: number) => request<void>(`/costing/packaging-items/${id}/`, { method: 'DELETE' }),
+  adjustPackagingStock: (id: number, newStock: number) =>
+    request<any>(`/costing/packaging-items/${id}/adjust-stock/`, {
+      method: 'POST',
+      body: JSON.stringify({ new_stock: newStock }),
+    }),
+  restockPackagingItem: (id: number, quantityAdded?: number) =>
+    request<any>(`/costing/packaging-items/${id}/restock/`, {
+      method: 'POST',
+      body: JSON.stringify({ quantity_added: quantityAdded }),
+    }),
 
   // Production
   getProductionOrders: () => request<any[]>('/production/orders/'),
@@ -207,7 +217,31 @@ export const api = {
   getInquiries: () => request<any[]>('/sales/inquiries/'),
   getInquiryReceiptPdfUrl: (id: number, inline = false) =>
     `${API_BASE}/sales/inquiries/${id}/receipt-image/${inline ? '?inline=1' : ''}`,
-  createInquiry: (data: any) => request<any>('/sales/inquiries/', { method: 'POST', body: JSON.stringify(data) }),
+  createInquiry: (data: any) => {
+    if (typeof FormData !== 'undefined' && data instanceof FormData) {
+      return request<any>('/sales/inquiries/', { method: 'POST', body: data });
+    }
+    if (data && data.payment_proof instanceof File) {
+      const fd = new FormData();
+      Object.entries(data).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          if (k === 'items_json') {
+            fd.append(k, JSON.stringify(v));
+          } else {
+            fd.append(k, v as any);
+          }
+        }
+      });
+      return request<any>('/sales/inquiries/', { method: 'POST', body: fd });
+    }
+    return request<any>('/sales/inquiries/', { method: 'POST', body: JSON.stringify(data) });
+  },
+  lookupCustomer: (name?: string, phone?: string) => {
+    const params = new URLSearchParams();
+    if (name) params.append('name', name);
+    if (phone) params.append('phone', phone);
+    return request<any>(`/sales/inquiries/lookup-customer/?${params.toString()}`);
+  },
   updateInquiry: (id: number, data: any) =>
     request<any>(`/sales/inquiries/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateInquiryStatus: (id: number, status: string) =>

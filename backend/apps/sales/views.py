@@ -2,6 +2,7 @@ import io
 import os
 import math
 import textwrap
+import json
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 
@@ -724,6 +725,42 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
     queryset = CustomerInquiry.objects.all().select_related('customer', 'converted_sale').prefetch_related('payments').order_by('-created_at')
     serializer_class = CustomerInquirySerializer
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='lookup-customer')
+    def lookup_customer(self, request):
+        name = request.query_params.get('name', '').strip()
+        phone = request.query_params.get('phone', '').strip()
+
+        if not name and not phone:
+            return Response({'found': False})
+
+        cust = None
+        if phone:
+            clean_digits = ''.join(c for c in phone if c.isdigit())
+            if len(clean_digits) >= 7:
+                cust = Customer.objects.filter(phone__icontains=clean_digits[-7:]).first()
+
+        if not cust and name and len(name) >= 3 and name.lower() != 'customer':
+            cust = Customer.objects.filter(name__iexact=name).first()
+            if not cust:
+                cust = Customer.objects.filter(name__istartswith=name).first()
+
+        if cust:
+            stamps = cust.recalculate_loyalty_stamps(save=True)
+            return Response({
+                'found': True,
+                'id': cust.id,
+                'customer_name': cust.name,
+                'customer_phone': cust.phone,
+                'delivery_address': cust.address,
+                'loyalty_card_number': cust.loyalty_card_number or f"CRV-LOY-{cust.id:04d}",
+                'loyalty_stamps': stamps,
+                'qualifying_orders_count': cust.qualifying_orders_count,
+                'total_orders': cust.total_orders,
+            })
+
+        return Response({'found': False})
 
     def get_queryset(self):
         sync_all_inquiries_to_sales()
@@ -772,18 +809,35 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
         notes = data.get('notes', '')
         initial_status = data.get('status', InquiryStatus.PENDING)
 
-        # Payment options
+        # Public / unauthenticated users cannot submit wholesale orders
+        if not request.user.is_authenticated and order_type == 'WHOLESALE':
+            order_type = 'REGULAR'
+            prefix = 'CRV-ORD'
+            inquiry_number = f"{prefix}-{order_timestamp}"
+
+        # Parse items_json if string (from multipart form data)
+        if isinstance(items_json, str):
+            try:
+                items_json = json.loads(items_json)
+            except Exception:
+                items_json = []
+
+        # Payment options & payment proof screenshot
         payment_type = data.get('payment_type', 'PAY_ON_PICKUP')
+        payment_proof_file = request.FILES.get('payment_proof')
         initial_deposit = Decimal(str(data.get('initial_deposit') or '0.00'))
         payment_due_date = parse_date_safe(data.get('payment_due_date'))
         payment_notes = data.get('payment_notes', '')
 
-        # Customer Profile Linking / Creation (auto-enrolls customer in Loyalty Card by name)
+        # Customer Profile Linking / Creation (auto-enrolls customer in Loyalty Card by phone or name)
         customer = None
-        if customer_name and customer_name != 'Customer':
+        if customer_phone:
+            clean_digits = ''.join(c for c in customer_phone if c.isdigit())
+            if len(clean_digits) >= 7:
+                customer = Customer.objects.filter(phone__icontains=clean_digits[-7:]).first()
+
+        if not customer and customer_name and customer_name.lower() != 'customer':
             customer = Customer.objects.filter(name__iexact=customer_name).first()
-        if not customer and customer_phone:
-            customer = Customer.objects.filter(phone=customer_phone, name__iexact=customer_name).first()
 
         if not customer and customer_name:
             customer = Customer.objects.create(
@@ -793,20 +847,27 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
                 address=delivery_address,
                 notes=f"Auto-enrolled in CRAVEABLES Loyalty Card on {timezone.now().strftime('%Y-%m-%d')}"
             )
+            customer.recalculate_loyalty_stamps()
         elif customer:
+            changed = False
             if customer_phone and not customer.phone:
                 customer.phone = customer_phone
+                changed = True
             if customer_email and not customer.email:
                 customer.email = customer_email
+                changed = True
             if delivery_address and not customer.address:
                 customer.address = delivery_address
-            customer.save()
+                changed = True
+            if changed:
+                customer.save()
+            customer.recalculate_loyalty_stamps()
 
         inquiry = CustomerInquiry.objects.create(
             inquiry_number=inquiry_number,
             shared_order_number=inquiry_number,
             customer=customer,
-            customer_name=customer_name,
+            customer_name=customer.name if customer else customer_name,
             customer_phone=customer_phone or (customer.phone if customer else ''),
             order_type=order_type,
             delivery_method=delivery_method,
@@ -819,6 +880,7 @@ class CustomerInquiryViewSet(viewsets.ModelViewSet):
             notes=notes,
             status=initial_status,
             payment_type=payment_type,
+            payment_proof=payment_proof_file,
             initial_deposit=initial_deposit,
             amount_paid=initial_deposit,
             payment_due_date=payment_due_date,

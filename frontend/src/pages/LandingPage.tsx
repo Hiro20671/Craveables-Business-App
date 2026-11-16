@@ -26,11 +26,14 @@ import {
   Smartphone,
   Share2,
   ThumbsUp,
-  MessageSquare
+  MessageSquare,
+  Upload,
+  QrCode,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { FeaturedOrder } from '../types';
+import { FeaturedOrder, CustomerLookupResult } from '../types';
 import { calculateWholesaleDiscount } from '../utils/pricing';
 
 interface MenuItem {
@@ -149,6 +152,38 @@ export const LandingPage: React.FC = () => {
   const [deliveryMethod, setDeliveryMethod] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [paymentPreference, setPaymentPreference] = useState<string>('PAY_ON_PICKUP');
+
+  // Payment Proof & Loyalty Card Verification States
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+  const [loyaltyMatch, setLoyaltyMatch] = useState<CustomerLookupResult | null>(null);
+  const [lookingUpLoyalty, setLookingUpLoyalty] = useState(false);
+
+  // Debounced Returning Customer & Loyalty Card Lookup
+  useEffect(() => {
+    const phoneDigits = customerPhone.replace(/\D/g, '');
+    const trimmedName = customerName.trim();
+    if (phoneDigits.length < 7 && trimmedName.length < 3) {
+      setLoyaltyMatch(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setLookingUpLoyalty(true);
+        const res = await api.lookupCustomer(trimmedName, phoneDigits);
+        if (res && res.found) {
+          setLoyaltyMatch(res);
+        } else {
+          setLoyaltyMatch(null);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLookingUpLoyalty(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [customerPhone, customerName]);
 
   // Featured Orders Gallery State (Section 1A)
   const [featuredOrders, setFeaturedOrders] = useState<FeaturedOrder[]>([]);
@@ -298,42 +333,50 @@ export const LandingPage: React.FC = () => {
     });
   };
 
+  // Public Storefront: All orders are retail pricing. Wholesale is exclusive to Owner Dashboard.
   const cartCalculations = Object.values(orderCart).map((item) => {
-    const ws = calculateWholesaleDiscount(item.name, item.price, item.qty);
     return {
       ...item,
       regularTotal: item.price * item.qty,
-      unitDiscount: ws.unitDiscount,
-      totalDiscount: ws.totalDiscount,
-      discountedTotal: ws.finalTotal,
-      tierBadge: ws.tierBadge,
-      discountLabel: ws.discountLabel,
+      unitDiscount: 0,
+      totalDiscount: 0,
+      discountedTotal: item.price * item.qty,
+      tierBadge: '',
+      discountLabel: '',
     };
   });
 
   const totalCartItems = cartCalculations.reduce((sum, item) => sum + item.qty, 0);
   const rawCartAmount = cartCalculations.reduce((sum, item) => sum + item.regularTotal, 0);
-  const totalCartDiscount = cartCalculations.reduce((sum, item) => sum + item.totalDiscount, 0);
-  const totalCartAmount = Math.max(0, rawCartAmount - totalCartDiscount);
+  const totalCartDiscount = 0;
+  const totalCartAmount = rawCartAmount;
 
   const generateOrderSummary = () => {
     let summary = `*CRAVEABLES ORDER INQUIRY*\n`;
     summary += `Made to Crave • Baked with Love\n\n`;
     summary += `Customer: ${customerName || 'Customer'}\n`;
     summary += `Contact: ${customerPhone || 'N/A'}\n`;
-    summary += `Date Needed: ${deliveryDate || 'ASAP'}\n\n`;
-    summary += `*Items Ordered:*\n`;
-    cartCalculations.forEach((item) => {
-      const discountText = item.totalDiscount > 0 ? ` (Wholesale discount: -₱${item.totalDiscount.toFixed(2)}) = ₱${item.discountedTotal.toFixed(2)}` : ` = ₱${item.regularTotal.toFixed(2)}`;
-      summary += `• ${item.qty}x ${item.name} (₱${item.price} each)${discountText}\n`;
-    });
-    if (totalCartDiscount > 0) {
-      summary += `\n*Subtotal: ₱${rawCartAmount.toFixed(2)}*\n`;
-      summary += `*Wholesale Savings: -₱${totalCartDiscount.toFixed(2)}*\n`;
+    summary += `Date Needed: ${deliveryDate || 'ASAP'}\n`;
+    summary += `Fulfillment: ${deliveryMethod === 'DELIVERY' ? 'Local Courier Delivery' : 'Kitchen Pickup (Lucena City)'}\n`;
+    if (deliveryMethod === 'DELIVERY' && deliveryAddress) {
+      summary += `Delivery Address: ${deliveryAddress}\n`;
     }
+    summary += `\n*Items Ordered:*\n`;
+    cartCalculations.forEach((item) => {
+      summary += `• ${item.qty}x ${item.name} (₱${item.price} each) = ₱${item.regularTotal.toFixed(2)}\n`;
+    });
     summary += `\n*Total Estimated: ₱${totalCartAmount.toFixed(2)}*\n`;
     if (orderNotes) summary += `Notes: ${orderNotes}\n`;
-    summary += `\nPayment: GCash / Bank Transfer / Cash upon pickup`;
+    const payMap: Record<string, string> = {
+      'GCASH': 'GCash (Payment Screenshot Proof Attached)',
+      'PAY_ON_PICKUP': 'Cash upon Kitchen Pickup (Lucena)',
+      'COD': 'Cash on Delivery (COD)',
+      'BANK_TRANSFER': 'Bank Transfer / Maya (Payment Proof Attached)',
+    };
+    summary += `Payment: ${payMap[paymentPreference] || paymentPreference}\n`;
+    if (paymentProofFile) {
+      summary += `Payment Proof: Attached (${paymentProofFile.name})\n`;
+    }
     return summary;
   };
 
@@ -383,12 +426,13 @@ export const LandingPage: React.FC = () => {
       const itemsList = Object.values(orderCart);
 
       const resp = await api.createInquiry({
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        order_type: orderType,
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone.trim(),
+        order_type: 'REGULAR',
         delivery_method: deliveryMethod,
-        delivery_address: deliveryMethod === 'DELIVERY' ? deliveryAddress : '',
+        delivery_address: deliveryMethod === 'DELIVERY' ? deliveryAddress.trim() : '',
         payment_type: paymentPreference,
+        payment_proof: paymentProofFile,
         target_date: deliveryDate || null,
         items_summary: summaryText,
         items_json: itemsList,
@@ -1198,13 +1242,50 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Returning Customer & Loyalty Card Status */}
+                {loyaltyMatch ? (
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 shadow-2xs flex items-start gap-2.5 animate-in fade-in">
+                    <div className="w-6 h-6 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ⭐
+                    </div>
+                    <div className="flex-1 text-[11px] text-amber-950 leading-snug">
+                      <p className="font-bold">
+                        Welcome back, {loyaltyMatch.customer_name}!
+                      </p>
+                      <p className="text-[10px] text-amber-900/90 mt-0.5">
+                        Loyalty Card <strong>{loyaltyMatch.loyalty_card_number}</strong> ({loyaltyMatch.loyalty_stamps} / 5 active stamps). This new order will be added to your card! 🧁
+                      </p>
+                      {loyaltyMatch.delivery_address && !deliveryAddress && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeliveryAddress(loyaltyMatch.delivery_address || '');
+                            setDeliveryMethod('DELIVERY');
+                          }}
+                          className="mt-1 text-[10px] font-bold text-amber-900 underline hover:text-amber-800"
+                        >
+                          Auto-fill saved address: {loyaltyMatch.delivery_address}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (customerName.trim().length >= 3 && customerPhone.trim().length >= 7) ? (
+                  <div className="p-2.5 rounded-xl bg-bakery-cream/70 border border-bakery-beige/80 text-[10px] text-bakery-muted flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-bakery-caramel shrink-0" />
+                    <span>New customer? You&apos;ll be automatically enrolled in our CRAVEABLES Loyalty Card upon order!</span>
+                  </div>
+                ) : null}
+
                 {/* Delivery Method Choice */}
                 <div>
                   <label className="block font-semibold text-bakery-chocolate mb-1">Fulfillment Option</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setDeliveryMethod('PICKUP')}
+                      onClick={() => {
+                        setDeliveryMethod('PICKUP');
+                        if (paymentPreference === 'COD') setPaymentPreference('PAY_ON_PICKUP');
+                      }}
                       className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-colors ${
                         deliveryMethod === 'PICKUP'
                           ? 'bg-white border-bakery-caramel ring-1 ring-bakery-caramel text-bakery-chocolate font-bold'
@@ -1220,7 +1301,10 @@ export const LandingPage: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => setDeliveryMethod('DELIVERY')}
+                      onClick={() => {
+                        setDeliveryMethod('DELIVERY');
+                        if (paymentPreference === 'PAY_ON_PICKUP') setPaymentPreference('COD');
+                      }}
                       className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-colors ${
                         deliveryMethod === 'DELIVERY'
                           ? 'bg-white border-bakery-caramel ring-1 ring-bakery-caramel text-bakery-chocolate font-bold'
@@ -1250,20 +1334,188 @@ export const LandingPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Payment Preference */}
+                {/* Payment Arrangement & GCash Integration */}
                 <div>
-                  <label className="block font-semibold text-bakery-chocolate mb-1">Preferred Payment Arrangement</label>
-                  <select
-                    value={paymentPreference}
-                    onChange={(e) => setPaymentPreference(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden focus:border-bakery-caramel text-xs text-bakery-chocolate"
-                  >
-                    <option value="PAY_ON_PICKUP">Cash on Kitchen Pickup / COD</option>
-                    <option value="GCASH">GCash (Send Slip after confirmation)</option>
-                    <option value="BANK_TRANSFER">Bank Transfer (BDO / BPI / Maya)</option>
-                    <option value="PARTIAL">50% Initial Deposit, Balance upon delivery</option>
-                    <option value="NEXT_WEEK">Special Payment Arrangement (Next Week)</option>
-                  </select>
+                  <label className="block font-semibold text-bakery-chocolate mb-1.5">
+                    How would you like to pay?
+                  </label>
+                  
+                  {/* Payment Choices Buttons */}
+                  <div className="grid grid-cols-2 gap-2 mb-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentPreference(deliveryMethod === 'DELIVERY' ? 'COD' : 'PAY_ON_PICKUP')}
+                      className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                        paymentPreference === 'PAY_ON_PICKUP' || paymentPreference === 'COD'
+                          ? 'bg-white border-bakery-caramel ring-1 ring-bakery-caramel text-bakery-chocolate font-bold shadow-2xs'
+                          : 'bg-white/60 border-bakery-beige text-bakery-muted hover:bg-bakery-cream'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        ₱
+                      </div>
+                      <div>
+                        <span className="block text-[11px] leading-tight">
+                          {deliveryMethod === 'DELIVERY' ? 'Cash on Delivery (COD)' : 'Cash on Pickup'}
+                        </span>
+                        <span className="block text-[9px] text-bakery-muted">
+                          {deliveryMethod === 'DELIVERY' ? 'Pay rider upon arrival' : 'Pay at kitchen in Lucena'}
+                        </span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentPreference('GCASH')}
+                      className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                        paymentPreference === 'GCASH'
+                          ? 'bg-white border-[#005CEE] ring-1 ring-[#005CEE] text-bakery-chocolate font-bold shadow-2xs'
+                          : 'bg-white/60 border-bakery-beige text-bakery-muted hover:bg-bakery-cream'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-[#005CEE] text-white flex items-center justify-center font-black text-xs shrink-0">
+                        G
+                      </div>
+                      <div>
+                        <span className="block text-[11px] leading-tight text-[#005CEE]">
+                          GCash / QR Ph
+                        </span>
+                        <span className="block text-[9px] text-bakery-muted">
+                          Scan QR &amp; send proof
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Cash Notice Box */}
+                  {(paymentPreference === 'PAY_ON_PICKUP' || paymentPreference === 'COD') && (
+                    <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-950 flex items-start gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">
+                          {deliveryMethod === 'DELIVERY' ? 'Cash on Delivery (COD) Selected' : 'Cash on Kitchen Pickup Selected'}
+                        </span>
+                        <p className="text-[10px] text-emerald-800 mt-0.5">
+                          {deliveryMethod === 'DELIVERY'
+                            ? `Please prepare exact cash ₱${totalCartAmount.toFixed(2)} when our local Lucena delivery courier arrives.`
+                            : `Please prepare cash ₱${totalCartAmount.toFixed(2)} when claiming your bakes at Purok St. Teresa, Mayao Parada, Lucena City.`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* GCash Official QR Code & Screenshot Upload Box */}
+                  {(paymentPreference === 'GCASH' || paymentPreference === 'BANK_TRANSFER') && (
+                    <div className="p-3.5 rounded-2xl bg-[#005CEE]/5 border border-[#005CEE]/25 space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#005CEE]/15">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-[#005CEE] text-white flex items-center justify-center font-black text-xs">
+                            G
+                          </div>
+                          <div>
+                            <span className="font-bold text-xs text-[#005CEE] block">Official Craveables GCash QR</span>
+                            <span className="text-[10px] text-bakery-muted">Amount: <strong className="text-bakery-chocolate">₱{totalCartAmount.toFixed(2)}</strong></span>
+                          </div>
+                        </div>
+                        <a
+                          href="/gcash-qr.jpg"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-[#005CEE] font-bold underline hover:opacity-80 flex items-center gap-1"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                          <span>View Full QR</span>
+                        </a>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="bg-white p-2 rounded-xl border border-bakery-beige shadow-2xs shrink-0 text-center">
+                          <img
+                            src="/gcash-qr.jpg"
+                            alt="Craveables GCash QR"
+                            className="w-32 sm:w-36 h-auto rounded-lg mx-auto object-contain"
+                          />
+                          <span className="text-[9px] text-[#005CEE] font-bold mt-1 block">Scan via GCash or Maya</span>
+                        </div>
+
+                        <div className="space-y-1.5 text-[11px] text-bakery-chocolate flex-1 w-full">
+                          <div className="p-2 rounded-xl bg-white border border-bakery-beige/80">
+                            <span className="text-[9px] text-bakery-muted block">Account Name:</span>
+                            <strong className="text-xs text-bakery-chocolate">Craveables (DY*A DE***S D.)</strong>
+                          </div>
+                          <div className="p-2 rounded-xl bg-white border border-bakery-beige/80">
+                            <span className="text-[9px] text-bakery-muted block">Registered Mobile Number:</span>
+                            <strong className="text-xs font-mono text-bakery-chocolate">+63 915 797 7797</strong>
+                          </div>
+                          <p className="text-[10px] text-bakery-muted leading-tight pt-0.5">
+                            Tip: You can scan the QR code directly using your GCash app or transfer to the mobile number above.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Payment Proof File Upload Section */}
+                      <div className="pt-2 border-t border-[#005CEE]/15">
+                        <label className="block font-bold text-xs text-bakery-chocolate mb-1.5">
+                          Upload GCash Payment Screenshot Proof *
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          id="gcash-proof-upload"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setPaymentProofFile(file);
+                              const reader = new FileReader();
+                              reader.onload = () => setPaymentProofPreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+
+                        {paymentProofPreview ? (
+                          <div className="p-2.5 rounded-xl bg-white border border-emerald-300 flex items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={paymentProofPreview}
+                                alt="Payment Proof Preview"
+                                className="w-12 h-12 object-cover rounded-lg border border-bakery-beige shrink-0"
+                              />
+                              <div className="text-[11px] min-w-0">
+                                <span className="text-emerald-700 font-bold block flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Screenshot Attached!</span>
+                                </span>
+                                <span className="text-[10px] text-bakery-muted truncate block">
+                                  {paymentProofFile?.name}
+                                </span>
+                              </div>
+                            </div>
+                            <label
+                              htmlFor="gcash-proof-upload"
+                              className="px-2.5 py-1.5 rounded-lg bg-bakery-cream hover:bg-bakery-beige text-bakery-chocolate text-[10px] font-bold cursor-pointer transition-colors shrink-0"
+                            >
+                              Change
+                            </label>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor="gcash-proof-upload"
+                            className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-[#005CEE]/40 hover:border-[#005CEE] bg-white flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-colors shadow-2xs"
+                          >
+                            <Upload className="w-5 h-5 text-[#005CEE]" />
+                            <span className="text-xs font-bold text-[#005CEE]">
+                              Tap here to attach GCash Payment Screenshot
+                            </span>
+                            <span className="text-[10px] text-bakery-muted">
+                              Upload the receipt screenshot from your GCash app so we can confirm right away
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>

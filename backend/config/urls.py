@@ -161,8 +161,8 @@ def serve_spa(request, resource=""):
       "description": "Small home bakery in Purok St. Teresa, Mayao Parada, Lucena City started by three friends — Dyna, Jeremy, and Anne. Freshly baked Banana Cake with ripe Philippine Lakatan bananas, dense fudgy brownies, and chewy cookies."
     }
     </script>
-    <script type="module" crossorigin src="/assets/index-CDCMMTIy.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CT9PcKvw.css">
+    <script type="module" crossorigin src="/assets/index-f8fYC6dY.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BGOxI409.css">
   </head>
   <body class="bg-[#FFF9DF] text-[#17110D]">
     <div id="root">

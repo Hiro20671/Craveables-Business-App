@@ -246,6 +246,7 @@ class CustomerInquiry(models.Model):
 
     # Payment Tracking / Receivables Fields
     payment_type = models.CharField(max_length=50, default='PAY_ON_PICKUP')
+    payment_proof = models.FileField(upload_to='payment_proofs/', null=True, blank=True, help_text="Customer uploaded GCash/payment screenshot proof")
     initial_deposit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     remaining_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -302,9 +303,14 @@ class CustomerInquiry(models.Model):
         if not self.customer_id and self.customer_name and self.customer_name.strip():
             clean_name = self.customer_name.strip()
             clean_phone = (self.customer_phone or '').strip()
-            cust = Customer.objects.filter(name__iexact=clean_name).first()
-            if not cust and clean_phone:
-                cust = Customer.objects.filter(phone=clean_phone).first()
+            cust = None
+            if clean_phone:
+                clean_digits = ''.join(c for c in clean_phone if c.isdigit())
+                if len(clean_digits) >= 7:
+                    cust = Customer.objects.filter(phone__icontains=clean_digits[-7:]).first()
+            if not cust and clean_name and clean_name.lower() != 'customer':
+                cust = Customer.objects.filter(name__iexact=clean_name).first()
+
             if not cust:
                 cust = Customer.objects.create(
                     name=clean_name,
@@ -313,6 +319,16 @@ class CustomerInquiry(models.Model):
                     notes=f"Auto-enrolled in CRAVEABLES Loyalty Card on {timezone.now().strftime('%Y-%m-%d')}"
                 )
                 cust.recalculate_loyalty_stamps()
+            else:
+                changed = False
+                if clean_phone and not cust.phone:
+                    cust.phone = clean_phone
+                    changed = True
+                if self.delivery_address and not cust.address:
+                    cust.address = self.delivery_address
+                    changed = True
+                if changed:
+                    cust.save()
             self.customer = cust
 
         super().save(*args, **kwargs)

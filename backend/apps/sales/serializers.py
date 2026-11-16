@@ -86,7 +86,7 @@ class CustomerInquirySerializer(serializers.ModelSerializer):
             'customer_name', 'customer_phone', 'order_type', 'delivery_method',
             'delivery_address', 'special_instructions', 'target_date',
             'items_summary', 'items_json', 'estimated_total', 'notes', 'status',
-            'payment_type', 'initial_deposit', 'amount_paid', 'remaining_balance',
+            'payment_type', 'payment_proof', 'initial_deposit', 'amount_paid', 'remaining_balance',
             'payment_due_date', 'payment_status', 'payment_notes',
             'converted_sale', 'payments', 'created_at', 'updated_at'
         ]

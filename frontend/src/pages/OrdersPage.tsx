@@ -42,7 +42,8 @@ import {
   Maximize2,
   Award,
   Gift,
-  Download
+  Download,
+  Smartphone
 } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateWholesaleDiscount, getWholesaleDescription } from '../utils/pricing';
@@ -140,9 +141,10 @@ export const OrdersPage: React.FC = () => {
   const [convertPaymentMethod, setConvertPaymentMethod] = useState<'GCash' | 'Cash' | 'Bank Transfer'>('GCash');
   const [convertingLoading, setConvertingLoading] = useState(false);
 
-  // Kitchen Slip / Print Modal & Receipt Image Preview Modal
+  // Kitchen Slip / Print Modal & Receipt Image Preview Modal & GCash Proof Modal
   const [slipInquiry, setSlipInquiry] = useState<CustomerInquiry | null>(null);
   const [receiptPreviewInquiry, setReceiptPreviewInquiry] = useState<CustomerInquiry | null>(null);
+  const [proofModalInquiry, setProofModalInquiry] = useState<CustomerInquiry | null>(null);
 
   // Create Manual Pre-Order Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1428,13 +1430,20 @@ export const OrdersPage: React.FC = () => {
                           <h3 className="font-display font-bold text-base text-bakery-chocolate mt-1">
                             {inq.customer_name}
                           </h3>
-                          <a
-                            href={`tel:${inq.customer_phone}`}
-                            className="text-xs text-bakery-muted flex items-center gap-1 hover:text-bakery-caramel"
-                          >
-                            <Phone className="w-3 h-3" />
-                            <span>{inq.customer_phone}</span>
-                          </a>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <a
+                              href={`tel:${inq.customer_phone}`}
+                              className="text-xs text-bakery-muted flex items-center gap-1 hover:text-bakery-caramel"
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span>{inq.customer_phone || 'No phone'}</span>
+                            </a>
+                            {inq.customer_details?.loyalty_card_number && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                🎫 {inq.customer_details.loyalty_card_number} ({inq.customer_details.loyalty_stamps} / 5 stamps)
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex flex-col items-end gap-1">
@@ -1538,6 +1547,18 @@ export const OrdersPage: React.FC = () => {
                           >
                             <ReceiptText className="w-3.5 h-3.5 text-bakery-caramel" />
                             <span>Convert Sale</span>
+                          </button>
+                        )}
+
+                        {inq.payment_proof && (
+                          <button
+                            type="button"
+                            onClick={() => setProofModalInquiry(inq)}
+                            className="px-2.5 py-1.5 rounded-xl bg-[#005CEE]/10 hover:bg-[#005CEE]/20 border border-[#005CEE]/30 text-[#005CEE] text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
+                            title="View Customer Uploaded GCash Screenshot Proof"
+                          >
+                            <Smartphone className="w-3.5 h-3.5 text-[#005CEE]" />
+                            <span>GCash Proof</span>
                           </button>
                         )}
 
@@ -2965,6 +2986,89 @@ export const OrdersPage: React.FC = () => {
         </div>
       )}
 
+            {/* MODAL: Customer GCash Payment Proof Screenshot Preview */}
+      {proofModalInquiry && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-bakery-ivory w-full max-w-lg rounded-3xl border border-bakery-beige shadow-warm-lg overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in">
+            <div className="p-4 bg-[#005CEE] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-white" />
+                <div>
+                  <h3 className="font-display font-bold text-sm">
+                    Customer GCash Payment Screenshot Proof
+                  </h3>
+                  <p className="text-[11px] text-white/80">
+                    {proofModalInquiry.shared_order_number || proofModalInquiry.inquiry_number} &bull; {proofModalInquiry.customer_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setProofModalInquiry(null)}
+                className="text-white/80 hover:text-white font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 text-xs bg-bakery-cream/40 flex-1">
+              <div className="p-3 rounded-2xl bg-white border border-bakery-beige flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-bakery-muted block">Order Total:</span>
+                  <span className="font-bold text-base text-bakery-chocolate">
+                    ₱{Number(proofModalInquiry.estimated_total || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-bakery-muted block">Payment Method:</span>
+                  <span className="font-bold text-xs text-[#005CEE]">
+                    {proofModalInquiry.payment_type || 'GCASH'}
+                  </span>
+                </div>
+              </div>
+
+              {proofModalInquiry.payment_proof ? (
+                <div className="bg-white p-2 rounded-2xl border border-bakery-beige text-center">
+                  <img
+                    src={proofModalInquiry.payment_proof}
+                    alt="Customer Payment Proof"
+                    className="max-h-[60vh] max-w-full rounded-xl mx-auto object-contain border border-bakery-beige shadow-2xs"
+                  />
+                  <div className="pt-2 text-[10px] text-bakery-muted">
+                    Uploaded by customer via online order slip
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-bakery-muted">
+                  No payment screenshot file attached for this order.
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-white border-t border-bakery-beige flex items-center justify-between">
+              {proofModalInquiry.payment_proof && (
+                <a
+                  href={proofModalInquiry.payment_proof}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-bakery-cream hover:bg-bakery-beige text-bakery-chocolate text-[11px] font-bold border border-bakery-beige"
+                >
+                  Open Full Size ↗
+                </a>
+              )}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setProofModalInquiry(null)}
+                  className="px-4 py-1.5 rounded-xl bg-bakery-chocolate text-white text-xs font-bold hover:bg-[#2c1108]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Official Receipt Image Preview & Download */}
       {receiptPreviewInquiry && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -3117,7 +3221,7 @@ export const OrdersPage: React.FC = () => {
 
             <form onSubmit={handleCreateManualOrder} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="relative">
                   <label className="block font-semibold text-bakery-chocolate mb-1">
                     {newOrderType === 'WHOLESALE' ? 'Reseller / Partner Name *' : 'Customer Name *'}
                   </label>
@@ -3129,6 +3233,44 @@ export const OrdersPage: React.FC = () => {
                     onChange={(e) => setNewCustName(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige text-xs text-bakery-chocolate focus:outline-hidden"
                   />
+                  {/* Autocomplete Dropdown for Existing Customers */}
+                  {newCustName.trim().length >= 1 && (() => {
+                    const matched = customers.filter(c =>
+                      c.name.toLowerCase().includes(newCustName.toLowerCase()) ||
+                      (c.phone && c.phone.includes(newCustName))
+                    ).slice(0, 5);
+                    const isExactMatch = customers.some(c => c.name.toLowerCase() === newCustName.trim().toLowerCase());
+                    if (matched.length > 0 && !isExactMatch) {
+                      return (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-bakery-beige shadow-lg z-20 overflow-hidden divide-y divide-bakery-beige/60">
+                          <div className="p-1.5 bg-bakery-cream text-[10px] text-bakery-muted font-bold uppercase tracking-wider">
+                            Matching Existing Customers ({matched.length})
+                          </div>
+                          {matched.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setNewCustName(c.name);
+                                if (c.phone) setNewCustPhone(c.phone);
+                                if (c.address) setNewDeliveryAddress(c.address);
+                              }}
+                              className="w-full text-left p-2 hover:bg-amber-50/80 transition-colors flex items-center justify-between text-xs"
+                            >
+                              <div>
+                                <span className="font-bold text-bakery-chocolate block">{c.name}</span>
+                                <span className="text-[10px] text-bakery-muted">{c.phone || 'No phone'}</span>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                                🎫 {c.loyalty_card_number || 'CRV-LOY-' + c.id} ({c.loyalty_stamps} stamps)
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div>
                   <label className="block font-semibold text-bakery-chocolate mb-1">Phone Number (optional)</label>
@@ -3141,6 +3283,43 @@ export const OrdersPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Existing Loyalty Customer Confirmation Banner */}
+              {(() => {
+                const foundCust = customers.find(c =>
+                  c.name.toLowerCase() === newCustName.trim().toLowerCase() ||
+                  (newCustPhone.trim().length >= 7 && c.phone && c.phone.replace(/\D/g, '').includes(newCustPhone.replace(/\D/g, '')))
+                );
+                if (foundCust) {
+                  return (
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-xs text-amber-950 flex items-center justify-between shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div>
+                          <span className="font-bold block">
+                            Confirmed Loyalty Customer: {foundCust.name}
+                          </span>
+                          <span className="text-[10px] text-amber-800">
+                            Card: <strong>{foundCust.loyalty_card_number || 'CRV-LOY-' + foundCust.id}</strong> &bull; {foundCust.loyalty_stamps} active stamps. Order will add stamps to this card!
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full shrink-0">
+                        Linked ✅
+                      </span>
+                    </div>
+                  );
+                }
+                if (newCustName.trim().length >= 2) {
+                  return (
+                    <div className="p-2 rounded-xl bg-bakery-cream/70 border border-bakery-beige text-[11px] text-bakery-muted flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-bakery-caramel shrink-0" />
+                      <span>New customer &ldquo;{newCustName.trim()}&rdquo; will be auto-enrolled with a new Loyalty Card upon saving.</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

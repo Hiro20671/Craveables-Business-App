@@ -14,6 +14,39 @@ class PackagingItemViewSet(viewsets.ModelViewSet):
     queryset = PackagingItem.objects.all().order_by('name')
     serializer_class = PackagingItemSerializer
 
+    @action(detail=True, methods=['post'], url_path='adjust-stock')
+    def adjust_stock(self, request, pk=None):
+        pkg = self.get_object()
+        new_quantity = request.data.get('new_stock')
+        if new_quantity is None:
+            return Response({'detail': 'New stock quantity is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_stock = Decimal(str(new_quantity))
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid quantity value.'}, status=status.HTTP_400_BAD_REQUEST)
+        if target_stock < 0:
+            return Response({'detail': 'Stock quantity cannot be negative.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pkg.current_stock = target_stock
+        pkg.save()
+        return Response(PackagingItemSerializer(pkg).data)
+
+    @action(detail=True, methods=['post'], url_path='restock')
+    def restock(self, request, pk=None):
+        pkg = self.get_object()
+        add_quantity = request.data.get('quantity_added')
+        if add_quantity is None:
+            # Default to 1 pack quantity
+            add_quantity = pkg.quantity
+        try:
+            qty_to_add = Decimal(str(add_quantity))
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid quantity value.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pkg.current_stock += qty_to_add
+        pkg.save()
+        return Response(PackagingItemSerializer(pkg).data)
+
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all().select_related(
         'product_variant', 'product_variant__product', 'product_variant__product__category'

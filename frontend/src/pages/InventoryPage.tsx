@@ -31,6 +31,9 @@ interface PackagingItem {
   quantity: number | string;
   cost_per_unit: number | string;
   default_needed_per_batch: number | string;
+  current_stock?: number | string;
+  reorder_level?: number | string;
+  is_low_stock?: boolean;
   created_at?: string;
 }
 
@@ -76,7 +79,14 @@ export const InventoryPage: React.FC = () => {
   const [pkgCost, setPkgCost] = useState('');
   const [pkgQty, setPkgQty] = useState('');
   const [pkgDefaultNeeded, setPkgDefaultNeeded] = useState('1');
+  const [pkgCurrentStock, setPkgCurrentStock] = useState('100');
+  const [pkgReorderLevel, setPkgReorderLevel] = useState('20');
   const [savingPackaging, setSavingPackaging] = useState(false);
+
+  // Quick Restock Packaging state
+  const [restockPkgItem, setRestockPkgItem] = useState<PackagingItem | null>(null);
+  const [restockPkgQty, setRestockPkgQty] = useState('20');
+  const [restockPkgSubmitting, setRestockPkgSubmitting] = useState(false);
 
   // Receipt Scanner state
   const [showScannerModal, setShowScannerModal] = useState(false);
@@ -184,6 +194,8 @@ export const InventoryPage: React.FC = () => {
     setPkgCost('');
     setPkgQty('50');
     setPkgDefaultNeeded('1');
+    setPkgCurrentStock('100');
+    setPkgReorderLevel('20');
     setShowPackagingModal(true);
   };
 
@@ -193,7 +205,29 @@ export const InventoryPage: React.FC = () => {
     setPkgCost(String(item.cost));
     setPkgQty(String(item.quantity));
     setPkgDefaultNeeded(String(item.default_needed_per_batch));
+    setPkgCurrentStock(String(item.current_stock ?? 100));
+    setPkgReorderLevel(String(item.reorder_level ?? 20));
     setShowPackagingModal(true);
+  };
+
+  const handleRestockPackagingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockPkgItem) return;
+    const addQty = parseFloat(restockPkgQty);
+    if (isNaN(addQty) || addQty <= 0) {
+      alert('Please enter a valid positive quantity to add');
+      return;
+    }
+    try {
+      setRestockPkgSubmitting(true);
+      await api.restockPackagingItem(restockPkgItem.id, addQty);
+      setRestockPkgItem(null);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to restock packaging item');
+    } finally {
+      setRestockPkgSubmitting(false);
+    }
   };
 
   const handleSavePackaging = async (e: React.FormEvent) => {
@@ -218,6 +252,8 @@ export const InventoryPage: React.FC = () => {
         cost: costVal,
         quantity: qtyVal,
         default_needed_per_batch: isNaN(neededVal) ? 1 : neededVal,
+        current_stock: parseFloat(pkgCurrentStock) || 0,
+        reorder_level: parseFloat(pkgReorderLevel) || 20,
       };
 
       if (editingPackaging) {
@@ -588,6 +624,7 @@ export const InventoryPage: React.FC = () => {
                   <th className="py-2.5 px-4 text-right">Cost / Unit (₱)</th>
                   <th className="py-2.5 px-4 text-right">Needed / Batch</th>
                   <th className="py-2.5 px-4 text-right">Cost / Batch (₱)</th>
+                  <th className="py-2.5 px-4 text-center">Stock in Bakery</th>
                   <th className="py-2.5 px-4 text-center">Actions</th>
                 </tr>
               </thead>
@@ -620,6 +657,31 @@ export const InventoryPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-right font-bold text-bakery-chocolate">
                           ₱{costPerBatch.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {Number(pkg.current_stock || 0) <= Number(pkg.reorder_level || 20) ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                <span>{Number(pkg.current_stock || 0)} pcs (Low)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200">
+                                <span>{Number(pkg.current_stock || 0)} pcs</span>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRestockPkgItem(pkg);
+                                setRestockPkgQty(String(pkg.quantity || 20));
+                              }}
+                              title="Restock packaging units"
+                              className="px-2 py-1 rounded-lg bg-bakery-cream hover:bg-bakery-beige border border-bakery-beige text-bakery-chocolate text-[10px] font-bold transition-colors"
+                            >
+                              + Restock
+                            </button>
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
@@ -848,6 +910,97 @@ export const InventoryPage: React.FC = () => {
         </div>
       )}
 
+            {/* Modal: Quick Restock Packaging */}
+      {restockPkgItem && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-bakery-ivory rounded-2xl border border-bakery-beige p-5 shadow-2xl animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-bakery-beige mb-3">
+              <h3 className="font-display font-bold text-base text-bakery-chocolate flex items-center gap-2">
+                <Package className="w-5 h-5 text-bakery-caramel" />
+                <span>Restock Packaging</span>
+              </h3>
+              <button
+                onClick={() => setRestockPkgItem(null)}
+                className="text-bakery-muted hover:text-bakery-chocolate font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRestockPackagingSubmit} className="space-y-3.5 text-xs">
+              <div className="p-3 rounded-xl bg-white border border-bakery-beige space-y-1">
+                <div className="font-bold text-bakery-chocolate text-sm">
+                  {restockPkgItem.name}
+                </div>
+                <div className="flex justify-between text-bakery-muted text-[11px]">
+                  <span>Current Stock:</span>
+                  <strong className="text-bakery-chocolate">{Number(restockPkgItem.current_stock || 0)} pcs</strong>
+                </div>
+                <div className="flex justify-between text-bakery-muted text-[11px]">
+                  <span>Units per Pack:</span>
+                  <strong>{restockPkgItem.quantity} pcs/pack</strong>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-bakery-chocolate mb-1">
+                  Quantity to Add (pcs) *
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  required
+                  value={restockPkgQty}
+                  onChange={(e) => setRestockPkgQty(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige font-bold text-sm text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel"
+                />
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRestockPkgQty(String(restockPkgItem.quantity || 20))}
+                    className="px-2 py-0.5 rounded-md bg-bakery-cream border border-bakery-beige text-[10px] font-bold text-bakery-chocolate hover:bg-bakery-beige"
+                  >
+                    +1 Pack ({restockPkgItem.quantity} pcs)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRestockPkgQty(String(Number(restockPkgItem.quantity || 20) * 2))}
+                    className="px-2 py-0.5 rounded-md bg-bakery-cream border border-bakery-beige text-[10px] font-bold text-bakery-chocolate hover:bg-bakery-beige"
+                  >
+                    +2 Packs ({Number(restockPkgItem.quantity || 20) * 2} pcs)
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 flex justify-between items-center">
+                <span>New Total Stock after restock:</span>
+                <strong className="text-sm font-bold text-emerald-800">
+                  {Number(restockPkgItem.current_stock || 0) + (parseFloat(restockPkgQty) || 0)} pcs
+                </strong>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-bakery-beige">
+                <button
+                  type="button"
+                  onClick={() => setRestockPkgItem(null)}
+                  className="px-3.5 py-1.5 rounded-xl border border-bakery-beige text-bakery-chocolate font-medium hover:bg-bakery-cream"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={restockPkgSubmitting}
+                  className="px-4 py-1.5 rounded-xl bg-bakery-chocolate text-white font-bold hover:bg-[#2c1108] disabled:opacity-50"
+                >
+                  {restockPkgSubmitting ? 'Restocking...' : 'Confirm Restock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Packaging Form Modal (Add / Edit) */}
       {showPackagingModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
@@ -927,6 +1080,41 @@ export const InventoryPage: React.FC = () => {
                   onChange={(e) => setPkgDefaultNeeded(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige focus:outline-hidden focus:border-bakery-caramel"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">
+                    Current Stock in Bakery (pcs) *
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    placeholder="100"
+                    value={pkgCurrentStock}
+                    onChange={(e) => setPkgCurrentStock(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel"
+                  />
+                  <span className="text-[10px] text-bakery-muted mt-0.5 block">Deducted automatically on production</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-bakery-chocolate mb-1">
+                    Low Stock Alert Level (pcs)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    placeholder="20"
+                    value={pkgReorderLevel}
+                    onChange={(e) => setPkgReorderLevel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-bakery-beige font-bold text-bakery-chocolate focus:outline-hidden focus:border-bakery-caramel"
+                  />
+                  <span className="text-[10px] text-bakery-muted mt-0.5 block">Alerts when stock drops below this</span>
+                </div>
               </div>
 
               {/* Live Cost calculation */}

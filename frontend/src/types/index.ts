@@ -104,6 +104,9 @@ export interface PackagingItem {
   cost_per_unit: string | number;
   default_needed_per_batch: string | number;
   cost_per_need: string | number;
+  current_stock?: string | number;
+  reorder_level?: string | number;
+  is_low_stock?: boolean;
 }
 
 export interface RecipeIngredient {
@@ -386,6 +389,7 @@ export interface CustomerInquiry {
   notes: string;
   status: OrderWorkflowStatus;
   payment_type?: string;
+  payment_proof?: string | null;
   initial_deposit?: string | number;
   amount_paid?: string | number;
   remaining_balance?: string | number;
@@ -450,3 +454,15 @@ export interface BusinessSettings {
   default_target_margin: string | number;
 }
 
+
+export interface CustomerLookupResult {
+  found: boolean;
+  id?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  delivery_address?: string;
+  loyalty_card_number?: string;
+  loyalty_stamps?: number;
+  qualifying_orders_count?: number;
+  total_orders?: number;
+}

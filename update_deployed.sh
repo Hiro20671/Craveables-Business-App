@@ -57,15 +57,8 @@ fi
 # 4. Verify frontend/dist bundle integrity & link zero-byte staticfiles
 echo "🎨 [3/6] Verifying production frontend bundle & linking static assets..."
 mkdir -p frontend/dist/assets
-if [ ! -s "frontend/dist/assets/index-CDCMMTIy.js" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-CDCMMTIy.js -o frontend/dist/assets/index-CDCMMTIy.js
-fi
-if [ ! -s "frontend/dist/assets/index-CT9PcKvw.css" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/assets/index-CT9PcKvw.css -o frontend/dist/assets/index-CT9PcKvw.css
-fi
-if [ ! -s "frontend/dist/index.html" ]; then
-    curl -sSL https://raw.githubusercontent.com/Hiro20671/Craveables-Business-App/main/frontend/dist/index.html -o frontend/dist/index.html
-fi
+LATEST_JS=$(ls frontend/dist/assets/index-*.js 2>/dev/null | head -n 1 || true)
+LATEST_CSS=$(ls frontend/dist/assets/index-*.css 2>/dev/null | head -n 1 || true)
 
 # Create zero-byte symlinks in backend/staticfiles so Nginx /static/ mapping uses 0 MB disk quota
 rm -rf backend/staticfiles
@@ -74,8 +67,12 @@ for item in "$REPO_DIR"/frontend/dist/*; do
     ln -sfn "$item" "$REPO_DIR/backend/staticfiles/$(basename "$item")"
 done
 
-echo "   ✔ JS Bundle Size: $(wc -c < frontend/dist/assets/index-CDCMMTIy.js) bytes"
-echo "   ✔ CSS Bundle Size: $(wc -c < frontend/dist/assets/index-CT9PcKvw.css) bytes"
+if [ -n "$LATEST_JS" ]; then
+    echo "   ✔ JS Bundle: $LATEST_JS ($(wc -c < "$LATEST_JS") bytes)"
+fi
+if [ -n "$LATEST_CSS" ]; then
+    echo "   ✔ CSS Bundle: $LATEST_CSS ($(wc -c < "$LATEST_CSS") bytes)"
+fi
 
 # 5. Locate & activate virtual environment
 echo "🐍 [4/6] Activating Python environment..."
