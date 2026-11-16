@@ -43,7 +43,8 @@ import {
   Award,
   Gift,
   Download,
-  Smartphone
+  Smartphone,
+  Banknote
 } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateWholesaleDiscount, getWholesaleDescription } from '../utils/pricing';
@@ -944,6 +945,14 @@ export const OrdersPage: React.FC = () => {
         </span>
       );
     }
+    if (inq.payment_proof && balance > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#005CEE]/15 text-[#005CEE] border border-[#005CEE]/30 animate-pulse" title="Customer attached GCash screenshot. Click View Proof to review & confirm payment.">
+          <Smartphone className="w-3 h-3" />
+          <span>GCash Proof (₱{balance.toFixed(2)})</span>
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-orange/10 text-status-orange border border-status-orange/20">
         <AlertCircle className="w-3 h-3" />
@@ -1452,6 +1461,59 @@ export const OrdersPage: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Payment Method / GCash Proof Alert Banner */}
+                      <div className="mt-2.5">
+                        {inq.payment_proof ? (
+                          <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50 border border-blue-200 shadow-2xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-[#005CEE] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                <Smartphone className="w-3.5 h-3.5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-[11px] text-[#005CEE]">GCash Proof Uploaded</span>
+                                  {balance > 0 ? (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-100 text-amber-850 border border-amber-300">
+                                      Needs Verification
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                      Verified &amp; Paid
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-blue-800/80">Customer attached payment screenshot</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setProofModalInquiry(inq)}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#005CEE] hover:bg-[#0048bc] text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors shrink-0"
+                              title="View Customer Uploaded GCash Screenshot Proof"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View Proof</span>
+                            </button>
+                          </div>
+                        ) : (inq.payment_type === 'GCASH' || inq.payment_type?.toLowerCase().includes('gcash')) ? (
+                          <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px]">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <Smartphone className="w-3.5 h-3.5 text-amber-700" />
+                              Payment: GCash (No screenshot attached)
+                            </span>
+                          </div>
+                        ) : (inq.payment_type === 'PAY_ON_PICKUP' || inq.payment_type === 'COD' || inq.payment_type?.toLowerCase().includes('cash')) ? (
+                          <div className="flex items-center gap-1.5 text-[11px] text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                            <Banknote className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="font-medium">
+                              {inq.delivery_method === 'DELIVERY' || inq.payment_type === 'COD'
+                                ? 'Payment: Cash on Delivery (COD)'
+                                : 'Payment: Cash on Kitchen Pickup'}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
                       {/* Details */}
                       <div className="mt-3 pt-3 border-t border-bakery-beige/60 space-y-2 text-xs">
                         <div className="flex items-center justify-between text-bakery-muted">
@@ -1554,11 +1616,11 @@ export const OrdersPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setProofModalInquiry(inq)}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#005CEE]/10 hover:bg-[#005CEE]/20 border border-[#005CEE]/30 text-[#005CEE] text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
+                            className="px-2.5 py-1.5 rounded-xl bg-[#005CEE] hover:bg-[#0048bc] text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors shadow-2xs"
                             title="View Customer Uploaded GCash Screenshot Proof"
                           >
-                            <Smartphone className="w-3.5 h-3.5 text-[#005CEE]" />
-                            <span>GCash Proof</span>
+                            <Eye className="w-3.5 h-3.5 text-white" />
+                            <span>View GCash Proof</span>
                           </button>
                         )}
 
@@ -1685,6 +1747,16 @@ export const OrdersPage: React.FC = () => {
                                   title="Convert to Official Sale"
                                 >
                                   Record Sale
+                                </button>
+                              )}
+                              {inq.payment_proof && (
+                                <button
+                                  type="button"
+                                  onClick={() => setProofModalInquiry(inq)}
+                                  className="p-1 rounded bg-[#005CEE]/15 border border-[#005CEE]/30 text-[#005CEE] hover:bg-[#005CEE]/25"
+                                  title="View Customer Uploaded GCash Screenshot Proof"
+                                >
+                                  <Smartphone className="w-3.5 h-3.5" />
                                 </button>
                               )}
                               <button
@@ -3044,18 +3116,33 @@ export const OrdersPage: React.FC = () => {
               )}
             </div>
 
-            <div className="p-3 bg-white border-t border-bakery-beige flex items-center justify-between">
+            <div className="p-3 bg-white border-t border-bakery-beige flex items-center justify-between gap-2">
               {proofModalInquiry.payment_proof && (
                 <a
                   href={proofModalInquiry.payment_proof}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-bakery-cream hover:bg-bakery-beige text-bakery-chocolate text-[11px] font-bold border border-bakery-beige"
+                  className="px-3 py-1.5 rounded-xl bg-bakery-cream hover:bg-bakery-beige text-bakery-chocolate text-[11px] font-bold border border-bakery-beige flex items-center gap-1 shrink-0"
                 >
-                  Open Full Size ↗
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Full Size ↗</span>
                 </a>
               )}
               <div className="flex items-center gap-2 ml-auto">
+                {Number(proofModalInquiry.remaining_balance ?? (Number(proofModalInquiry.estimated_total || 0) - Number(proofModalInquiry.amount_paid || 0))) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = proofModalInquiry;
+                      setProofModalInquiry(null);
+                      openPaymentModal(target);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Confirm GCash (Pay ₱{Number(proofModalInquiry.remaining_balance ?? (Number(proofModalInquiry.estimated_total || 0) - Number(proofModalInquiry.amount_paid || 0))).toFixed(0)})</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setProofModalInquiry(null)}
